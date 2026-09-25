@@ -1,0 +1,49 @@
+{
+	"name": "agent-repl",
+	"version": "0.1.0",
+	"private": true,
+	"description": "Shared tmux REPLs (Python, Julia, R, and more) for coding agents over MCP, from pi-repl: Claude Code, Codex, OpenCode and others.",
+	"license": "MIT",
+	"type": "module",
+	"bin": {
+		"agent-repl": "dist/cli.js"
+	},
+	"files": [
+		"dist",
+		"README.md",
+		"LICENSE"
+	],
+	"scripts": {
+		"build": "node scripts/build.mjs",
+		"typecheck": "tsc --noEmit",
+		"sync": "node scripts/sync-from-pi-repl.mjs",
+		"test": "npm run build && node --test test/*.test.mjs",
+		"test:upstream": "node --import tsx --test test/upstream/*.test.js",
+		"test:all": "npm test && npm run test:upstream"
+	},
+	"engines": {
+		"node": ">=22"
+	},
+	"dependencies": {
+		"@modelcontextprotocol/sdk": "^1.30.1",
+		"typebox": "^1.3.34"
+	},
+	"devDependencies": {
+		"@types/node": "^22.20.4",
+		"tsx": "^4.23.15",
+		"typescript": "^5.9.3"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/omaclaren/agent-repl.git"
+	},
+	"keywords": [
+		"repl",
+		"tmux",
+		"mcp",
+		"claude-code",
+		"codex",
+		"opencode",
+		"pi-repl"
+	]
+}
