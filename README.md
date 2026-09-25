@@ -44,18 +44,12 @@ print(f(1000))
 - [tmux](https://github.com/tmux/tmux)
 - The runtimes you want to use, available as commands in your login shell: `python` or `ipython`, `julia`, `R`, `ghci`, `clojure`, `irb`, `jshell`, `octave-cli`, `matlab`, `gnuplot` or `cling`
 
-agent-repl is developed and tested on macOS. pi-repl also supports Linux, and Windows through WSL.
+agent-repl is an early release, developed and tested on macOS. pi-repl also supports Linux, and Windows through WSL.
 
 ## Install
 
-agent-repl is not on npm yet. From a clone:
-
 ```bash
-git clone https://github.com/omaclaren/agent-repl
-cd agent-repl
-npm install
-npm run build
-npm link            # puts the agent-repl command on your PATH
+npm install -g agent-repl
 ```
 
 ## Setting up an agent
@@ -157,7 +151,10 @@ The echo setting behaves differently outside Pi: it belongs to each MCP server p
 ## Development
 
 ```bash
+git clone https://github.com/omaclaren/agent-repl
+cd agent-repl
 npm install
+npm link               # use this checkout as the agent-repl command
 npm test               # builds, then runs the unit and end-to-end tests
 npm run test:upstream  # pi-repl's test suite against the generated copy
 npm run typecheck
@@ -167,4 +164,4 @@ The end-to-end tests start `agent-repl mcp` and the command line against a real 
 
 ## License
 
-MIT
+MIT. The files in `src/pi-compat` copied from Pi are MIT licensed, © 2025 Mario Zechner; see [`src/pi-compat/LICENSE`](src/pi-compat/LICENSE).

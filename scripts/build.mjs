@@ -1,5 +1,6 @@
 // Compiles src/ to dist/ with tsc, then copies the JavaScript that is used
-// as-is (pi-repl's shared/ and the Pi helpers in pi-compat/) verbatim.
+// as-is (pi-repl's shared/ and the Pi helpers in pi-compat/, with their
+// licence) verbatim.
 import { execFileSync } from "node:child_process";
 import { chmodSync, cpSync, readdirSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -11,6 +12,6 @@ rmSync(dist, { recursive: true, force: true });
 execFileSync(process.execPath, [join(root, "node_modules", "typescript", "bin", "tsc"), "-p", join(root, "tsconfig.json")], { stdio: "inherit" });
 cpSync(join(root, "src", "shared"), join(dist, "shared"), { recursive: true });
 for (const name of readdirSync(join(root, "src", "pi-compat"))) {
-	if (name.endsWith(".js")) cpSync(join(root, "src", "pi-compat", name), join(dist, "pi-compat", name));
+	if (name.endsWith(".js") || name === "LICENSE") cpSync(join(root, "src", "pi-compat", name), join(dist, "pi-compat", name));
 }
 chmodSync(join(dist, "cli.js"), 0o755);
