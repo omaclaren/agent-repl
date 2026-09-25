@@ -4,6 +4,9 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+### Documentation
+- Set `PI_REPL_AGENT_LABEL` in the OpenCode configuration example: OpenCode 2 identifies itself to MCP servers only as `cli`.
+
 ## [0.1.0] — 2026-09-25
 
 First public release.

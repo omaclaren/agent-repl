@@ -73,7 +73,12 @@ codex mcp add agent-repl -- agent-repl mcp
 ```json
 {
   "mcp": {
-    "agent-repl": { "type": "local", "command": ["agent-repl", "mcp"], "enabled": true }
+    "agent-repl": {
+      "type": "local",
+      "command": ["agent-repl", "mcp"],
+      "environment": { "PI_REPL_AGENT_LABEL": "OpenCode" },
+      "enabled": true
+    }
   }
 }
 ```
@@ -125,7 +130,7 @@ An agent can also pass `echoMode` for a single `repl_send`. Full mode keeps long
 
 ## Agent names in the record
 
-Entries in the clean record, and in `agent-repl export`, are labelled with the name the agent gives when it connects: `Claude Code`, `Codex` or `OpenCode`, or the raw client name for other agents. To choose the label yourself, set `PI_REPL_AGENT_LABEL` in the server's environment, as for the echo setting. Submissions from Pi are labelled `Pi`.
+Entries in the clean record, and in `agent-repl export`, are labelled with the name the agent gives when it connects: `Claude Code` and `Codex` name themselves, and other agents are labelled with whatever name they send. To choose the label yourself, set `PI_REPL_AGENT_LABEL` in the server's environment, as for the echo setting. OpenCode 2 identifies itself only as `cli`, so the OpenCode configuration above sets the label. Submissions from Pi are labelled `Pi`.
 
 ## Privacy and safety
 
