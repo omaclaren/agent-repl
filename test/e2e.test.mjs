@@ -4,7 +4,7 @@
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,7 +35,7 @@ before(async () => {
 	env = { ...process.env, HOME: home, SHELL: "/bin/sh", PATH: `${bin}:${process.env.PATH}`, TMPDIR: root,
 		TMUX_TMPDIR: socketRoot, PI_REPL_CONTROL_ROOT: join(root, "controls") };
 	for (const key of ["TMUX", "TMUX_PANE", "PI_REPL_ECHO_MODE", "PYTHONSTARTUP"]) delete env[key];
-	client = new Client({ name: "agent-repl-e2e", version: "0" });
+	client = new Client({ name: "agent-repl-e2e", title: "E2E Agent", version: "0" });
 	await client.connect(new StdioClientTransport({ command: process.execPath, args: [cli, "mcp"], cwd: project, env, stderr: "pipe" }));
 });
 
@@ -67,6 +67,8 @@ test("MCP: start a Python REPL, run code in it and report its status", { skip },
 	const status = await client.callTool({ name: "repl_status", arguments: { target: "python" } });
 	assert.match(text(status), /REPL session is running/);
 	assert.match(text(status), /Session: pi-repl-python/);
+	// pi-repl records the submissions under the client's name.
+	assert.match(text(status), /Latest clean entry: pi-repl · E2E Agent · /);
 });
 
 test("CLI: status, attach instructions and stop use the same session", { skip }, async () => {
@@ -78,6 +80,12 @@ test("CLI: status, attach instructions and stop use the same session", { skip },
 	const attach = run("attach", "python");
 	assert.equal(attach.status, 0, attach.stderr);
 	assert.match(attach.stdout, /^tmux attach -t pi-repl-python$/m);
+
+	const exported = run("export", "python");
+	assert.equal(exported.status, 0, exported.stderr);
+	const markdown = readdirSync(project).filter(name => name.endsWith(".md")).map(name => readFileSync(join(project, name), "utf8")).join("\n");
+	assert.match(markdown, /^## 1\. E2E Agent$/m);
+	assert.match(markdown, /^42$/m);
 
 	const stop = run("stop", "python");
 	assert.equal(stop.status, 0, stop.stderr);

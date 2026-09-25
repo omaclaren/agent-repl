@@ -30,6 +30,8 @@ matlab, gnuplot, cpp. Sessions are the tmux sessions pi-repl uses
 Environment:
   PI_REPL_ECHO_MODE     off, summary (default) or full: how much submitted code
                         the MCP server echoes into the REPL pane
+  PI_REPL_AGENT_LABEL   name recorded for submissions (default: the agent's own
+                        name, such as Claude Code or Codex)
   PI_REPL_CONTROL_ROOT  directory for the private files used to submit code`;
 
 const SUBCOMMANDS = new Set(["status", "env", "stop", "attach", "export", "echo", "help"]);

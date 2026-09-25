@@ -3,13 +3,13 @@ import assert from "node:assert/strict";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { loadPiRepl } from "../dist/host.js";
-import { createMcpServer } from "../dist/mcp.js";
+import { agentLabel, createMcpServer } from "../dist/mcp.js";
 import { forAgentRepl } from "../dist/text.js";
 
-async function connect() {
+async function connect(clientInfo = { name: "test", version: "0" }) {
 	const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 	const server = createMcpServer({ cwd: process.cwd(), version: "0.0.0-test", log: () => {} });
-	const client = new Client({ name: "test", version: "0" });
+	const client = new Client(clientInfo);
 	await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
 	return { client, close: () => Promise.all([client.close(), server.close()]) };
 }
@@ -53,4 +53,28 @@ test("invalid arguments are reported as tool errors without running anything", a
 	assert.match(runtime.content[0].text, /runtime/);
 	const unknown = await client.callTool({ name: "repl_reset", arguments: {} });
 	assert.equal(unknown.isError, true);
+});
+
+test("submissions are labelled with the connecting agent's name unless PI_REPL_AGENT_LABEL is set", async (t) => {
+	assert.equal(agentLabel({ name: "claude-code", title: "Claude Code", version: "2" }), "Claude Code");
+	assert.equal(agentLabel({ name: "codex-mcp-client", title: "Codex", version: "0" }), "Codex");
+	assert.equal(agentLabel({ name: "opencode", version: "1" }), "OpenCode");
+	assert.equal(agentLabel({ name: "some-agent", version: "1" }), "some-agent");
+
+	const original = process.env.PI_REPL_AGENT_LABEL;
+	t.after(() => {
+		if (original === undefined) delete process.env.PI_REPL_AGENT_LABEL;
+		else process.env.PI_REPL_AGENT_LABEL = original;
+	});
+	delete process.env.PI_REPL_AGENT_LABEL;
+	const first = await connect({ name: "claude-code", title: "Claude Code", version: "2" });
+	await first.client.listTools(); // after the initialized notification
+	assert.equal(process.env.PI_REPL_AGENT_LABEL, "Claude Code");
+	await first.close();
+
+	process.env.PI_REPL_AGENT_LABEL = "My label";
+	const second = await connect({ name: "opencode", version: "1" });
+	await second.client.listTools();
+	assert.equal(process.env.PI_REPL_AGENT_LABEL, "My label");
+	await second.close();
 });

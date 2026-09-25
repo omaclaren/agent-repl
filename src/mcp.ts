@@ -6,11 +6,13 @@
 // description, and guidance on choosing a target and on particular runtimes
 // goes with the `target` parameter.
 // Tool results are pi-repl's text content; its `details` feed Pi's UI and are
-// not shown to the model in Pi either.
+// not shown to the model in Pi either. pi-repl labels recorded submissions with
+// PI_REPL_AGENT_LABEL, which the server sets from the connecting client's name
+// unless it is already set.
 import { randomUUID } from "node:crypto";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { CallToolRequestSchema, ListToolsRequestSchema, type Tool } from "@modelcontextprotocol/sdk/types.js";
+import { CallToolRequestSchema, ListToolsRequestSchema, type Implementation, type Tool } from "@modelcontextprotocol/sdk/types.js";
 import { Compile } from "typebox/compile";
 import { Value } from "typebox/value";
 import { hostContext, loadPiRepl, type Level } from "./host.js";
@@ -24,6 +26,15 @@ Start or reuse a session with repl_start, choosing the runtime explicitly, then 
 These are the same tmux sessions pi-repl uses (pi-repl-python, pi-repl-julia, ...), so other agents and Pi may be using them too. Messages from these tools can mention pi-repl's Pi commands /repl and /lab; outside Pi the same command is \`agent-repl\` in a terminal (\`/repl stop python\` is \`agent-repl stop python\`).`;
 
 const TARGET_GUIDANCE = /^(?:In (?:GHCi|Clojure|Ruby|Java)|For (?:Octave|MATLAB|C\+\+|gnuplot))(?!\w)|\btarget='/;
+
+// Claude Code and Codex send a display title; OpenCode sends only its name.
+const CLIENT_NAMES: Record<string, string> = { opencode: "OpenCode" };
+
+/** The name recorded for a client's submissions, e.g. "Claude Code" for claude-code. */
+export function agentLabel(client: Implementation | undefined): string | undefined {
+	if (!client) return undefined;
+	return client.title?.trim() || CLIENT_NAMES[client.name] || client.name?.trim() || undefined;
+}
 
 type JsonSchema = { properties?: Record<string, { description?: string }>; [key: string]: unknown };
 
@@ -71,6 +82,11 @@ export function createMcpServer({ cwd, version, log = message => process.stderr.
 	const { tools } = loadPiRepl();
 	const described = [...tools.values()].map(describeTool);
 	const server = new Server({ name: "agent-repl", title: "agent-repl", version }, { capabilities: { tools: {} }, instructions: INSTRUCTIONS });
+	const labelSetByUser = Boolean(process.env.PI_REPL_AGENT_LABEL?.trim());
+	server.oninitialized = () => {
+		const label = agentLabel(server.getClientVersion());
+		if (!labelSetByUser && label) process.env.PI_REPL_AGENT_LABEL = label;
+	};
 	server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: described }));
 	server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
 		const tool = tools.get(request.params.name);

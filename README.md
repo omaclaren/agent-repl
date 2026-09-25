@@ -36,7 +36,7 @@ print(f(1000))
 - **MCP tools**: `repl_start`, `repl_status` and `repl_send`, with pi-repl's descriptions and guidance for each runtime.
 - **Command line**: start, attach to, inspect, export and stop sessions from a terminal.
 - **Labelled submissions**: code sent by an agent appears in the pane with its output between labelled markers, as above. How much code is shown can be changed (see [Echo setting](#echo-setting)).
-- **Records**: pi-repl keeps a raw log of each session's pane and a clean record of submitted code and output, which can be exported as Markdown. A compatible [pi-studio](https://github.com/omaclaren/pi-studio) using the same session shares the clean record.
+- **Records**: pi-repl keeps a raw log of each session's pane and a clean record of submitted code and output, which can be exported as Markdown. Each entry in the record names the agent that sent it. A compatible [pi-studio](https://github.com/omaclaren/pi-studio) using the same session shares the clean record.
 
 ## Requirements
 
@@ -129,6 +129,10 @@ claude mcp add --scope user -e PI_REPL_ECHO_MODE=off agent-repl -- agent-repl mc
 
 An agent can also pass `echoMode` for a single `repl_send`. Full mode keeps longer source code in the pane's history.
 
+## Agent names in the record
+
+Entries in the clean record, and in `agent-repl export`, are labelled with the name the agent gives when it connects: `Claude Code`, `Codex` or `OpenCode`, or the raw client name for other agents. To choose the label yourself, set `PI_REPL_AGENT_LABEL` in the server's environment, as for the echo setting. Submissions from Pi are labelled `Pi`.
+
 ## Privacy and safety
 
 An agent's code runs in your REPL with your permissions. Whether the agent asks before calling a tool is decided by the agent's own permission settings. Anyone who can reach your tmux server can see and type into these sessions.
@@ -148,7 +152,7 @@ npm run test:all
 
 pi-repl's own test suite is copied to `test/upstream` with only its import paths changed, and runs against the generated copy with `npm run test:upstream`. Tests for optional runtimes are skipped unless `PI_REPL_TEST_RUNTIMES` selects them, as in pi-repl.
 
-Two things behave differently outside Pi. The echo setting belongs to each MCP server process, so `agent-repl echo` only explains how to set it. Clean-record entries keep pi-repl's labels, so submissions from any agent are labelled `Pi`.
+The echo setting behaves differently outside Pi: it belongs to each MCP server process, so `agent-repl echo` only explains how to set it.
 
 ## Development
 
