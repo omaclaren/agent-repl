@@ -4,6 +4,14 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+## [0.1.2] — 2026-10-19
+
+### Changed
+- Generated from pi-repl 0.8.3.
+
+### Fixed
+- agent-repl works when the locale is not UTF-8, for example with `LANG` unset. Commands and tools failed with "no panes found", because tmux printed the tabs in its pane listings as `_`.
+
 ## [0.1.1] — 2026-10-19
 
 ### Changed
