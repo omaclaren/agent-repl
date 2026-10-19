@@ -42,7 +42,7 @@ export interface ExtensionAPI {
 	exec(command: string, args: string[], options?: ExecOptions): Promise<ExecResult>;
 	registerTool<TParams extends TSchema = TSchema, TDetails = unknown>(tool: ToolDefinition<TParams, TDetails>): void;
 	registerCommand(name: string, options: CommandDefinition): void;
-	// Pi's conversation events. agent-repl's host has none: one MCP server
-	// serves one agent conversation.
-	on?(event: string, handler: () => void): void;
+	// Pi's conversation and run events. agent-repl's host has none: one MCP
+	// server serves one agent conversation, and nothing is added at run start.
+	on?(event: string, handler: (event: unknown, ctx: ExtensionContext) => unknown): void;
 }

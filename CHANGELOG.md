@@ -4,6 +4,14 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-10-20
+
+### Changed
+- Generated from pi-repl 0.10.0. Its new run-start pane text needs Pi's run events, which agent-repl doesn't have, so `PI_REPL_PANE_ACTIVITY=on` and `send` both report pane text only in send results here, as the README now says. The attach notice now names the model provider.
+
+### Fixed
+- A tmux command killed at its timeout counts as failed even when it reports exit code 0, so a timed-out pane capture is no longer taken as an empty pane. From pi-repl 0.10.0.
+
 ## [0.2.0] — 2026-10-20
 
 ### Added

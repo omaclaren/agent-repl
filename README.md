@@ -136,7 +136,7 @@ Entries in the clean record, and in `agent-repl export`, are labelled with the n
 
 `repl_send` tells the agent what appeared in the pane since its own last send, before its new code: what you typed at the prompt, other agents' or Pi's sends, and output that arrived later. Its first send to a session it hasn't seen shows the pane's recent text, and `repl_status` previews the same text. These reports are bounded, are labelled as untrusted terminal text, and never enter the clean record.
 
-That text, including anything you type, reaches the agent and its model provider. To stop it, set `PI_REPL_PANE_ACTIVITY=off` in the server's environment, as for the echo setting. It stops reports while it is set but does not erase the pane's history. The MCP server can't tell when an agent clears or compacts its own context, so after that the agent may lack pane text it was shown before.
+That text, including anything you type, reaches the agent and its model provider. To stop it, set `PI_REPL_PANE_ACTIVITY=off` in the server's environment, as for the echo setting. In Pi, pi-repl also adds this text when a run starts, before the model plans; an MCP server can't do that, so here `on` (the default) and `send` both report only in send results. It stops reports while it is set but does not erase the pane's history. The MCP server can't tell when an agent clears or compacts its own context, so after that the agent may lack pane text it was shown before.
 
 ## Privacy and safety
 
