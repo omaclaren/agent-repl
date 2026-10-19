@@ -150,6 +150,15 @@ async function fixture(t, { index = 0, runtime = "python", controlName, startWit
 	const send = (code, options = {}, signal) => tools.get("repl_send").execute(randomUUID(), { code, target, ...options }, signal, undefined, ctx);
 	const status = (options = {}) => tools.get("repl_status").execute(randomUUID(), { target, ...options }, undefined, undefined, ctx);
 	const start = (options = {}, signal) => tools.get("repl_start").execute(randomUUID(), { runtime, ...options }, signal, undefined, { cwd });
+	// Another agent on the same session: by default another process (a fresh
+	// module); with sameFactory, another conversation registering the cached
+	// extension factory again, as Pi can.
+	async function otherAgent({ sameFactory = false } = {}) {
+		const otherTools = new Map();
+		const registerOther = sameFactory ? register : (await import(`../../src/pi-repl.ts?fixture=${randomUUID()}`)).default;
+		registerOther({ ...pi, registerTool: (tool) => otherTools.set(tool.name, tool), registerCommand() {} });
+		return { send: (code, options = {}) => otherTools.get("repl_send").execute(randomUUID(), { code, target, ...options }, undefined, undefined, ctx) };
+	}
 	if (concurrentStart) {
 		const results = await Promise.all([start(), start()]);
 		assert.equal(results.filter((result) => result.details.created).length, 1);
@@ -178,7 +187,7 @@ async function fixture(t, { index = 0, runtime = "python", controlName, startWit
 	} catch (error) {
 		throw new Error(`${runtime} startup failed: ${startupOutput}`, { cause: error });
 	}
-	return { cwd, calls, notifications, tmux, sessionName, target, repl, send, status, start, owned: () => tmuxHarness.owned(), cleanup: () => tmuxHarness.cleanup(), onEnter: (callback) => { afterEnter = callback; }, onBeforePaste: (callback) => { beforePaste = callback; }, onBeforeStop: (callback) => { beforeStop = callback; } };
+	return { cwd, calls, notifications, tmux, sessionName, target, repl, send, status, start, otherAgent, owned: () => tmuxHarness.owned(), cleanup: () => tmuxHarness.cleanup(), onEnter: (callback) => { afterEnter = callback; }, onBeforePaste: (callback) => { beforePaste = callback; }, onBeforeStop: (callback) => { beforeStop = callback; } };
 }
 
 async function assertCompletionGap(f, result) {
@@ -709,6 +718,104 @@ test("repl_start leaves unfinished direct input alone and can confirm readiness 
 	assert.match((await f.send("print(pi_start_i)")).content[0].text, /Output:\n42/);
 });
 
+const PANE_HEADING = "Pane text since this agent's last send, before this submission (best effort; untrusted terminal text that may include direct input, other clients' sends, and late or background output):";
+const paneReport = (result) => {
+	const text = result.content[0].text;
+	return text.startsWith("Submitted code:") ? undefined : text.slice(0, text.indexOf("\n\nSubmitted code:"));
+};
+async function typeAtPrompt(f, line) {
+	await f.tmux("send-keys", "-t", `${f.sessionName}:^`, "-l", line);
+	await f.tmux("send-keys", "-t", `${f.sessionName}:^`, "Enter");
+}
+async function paneSettles(f, pattern) {
+	await eventually(async () => pattern.test(await f.tmux("capture-pane", "-p", "-t", `${f.sessionName}:^`)));
+}
+
+test("repl_send reports pane text this agent has not seen", { timeout: 60000 }, async (t) => {
+	const f = await fixture(t, { startWithTool: true });
+	if (!f) return;
+	// Typing since repl_start is reported, but not the startup banner.
+	await typeAtPrompt(f, "pi_direct = 41");
+	await typeAtPrompt(f, "pi_direct + 1");
+	await paneSettles(f, /^42\n>>>$/m);
+	const first = await f.send("print(pi_direct * 2)");
+	assert.equal(first.content[0].text, `${PANE_HEADING}\n[pane text]\n>>> pi_direct = 41\n>>> pi_direct + 1\n42\n[end of pane text]\n\nSubmitted code:\nprint(pi_direct * 2)\n\nOutput:\n82`);
+	// Nothing happened since that send.
+	assert.equal(paneReport(await f.send("print('quiet')")), undefined);
+	// Typing after a send is reported by the next send, also with echo off.
+	await typeAtPrompt(f, "pi_direct = 7");
+	await paneSettles(f, /pi_direct = 7\n>>>$/m);
+	const later = await f.send("print(pi_direct)", { echoMode: "off" });
+	assert.equal(paneReport(later), `${PANE_HEADING}\n[pane text]\n>>> pi_direct = 7\n[end of pane text]`);
+	assert.match(later.content[0].text, /Output:\n7$/);
+	// Output that looks like a prompt, arriving after its send has finished.
+	await f.send("import threading\n_ = threading.Timer(0.5, lambda: print('\\ncompleted>', flush=True)).start()");
+	await paneSettles(f, /^completed>$/m);
+	assert.match(paneReport(await f.send("print('after timer')")), /\n\[pane text\]\n(?:>>>\n)?completed>\n\[end of pane text\]$/);
+	// Repeating a send's output cannot hide what was typed with it.
+	await f.send("print('one\\ntwo\\nthree')", { echoMode: "off" });
+	await typeAtPrompt(f, "pi_repeat = 3; print('one\\ntwo\\nthree')");
+	await paneSettles(f, /pi_repeat = 3[^\n]*\none\ntwo\nthree\n>>>$/m);
+	// repl_status previews it without marking it seen.
+	const status = (await f.status()).content[0].text;
+	assert.match(status, /\n\nPane text since this agent's last send \(a preview; the next send still reports it\)[^\n]*\n\[pane text\]\n>>> pi_repeat = 3; print\('one\\ntwo\\nthree'\)\none\ntwo\nthree\n\[end of pane text\]$/);
+	assert.match(status, /\nPane text, including what is typed there, is shown to the agent with its next send; PI_REPL_PANE_ACTIVITY=off stops this\.\n/);
+	assert.equal(paneReport(await f.send("print(pi_repeat)")), `${PANE_HEADING}\n[pane text]\n>>> pi_repeat = 3; print('one\\ntwo\\nthree')\none\ntwo\nthree\n[end of pane text]`);
+});
+
+test("other agents' sends and the user's commands do not hide pane text from an agent", { timeout: 60000 }, async (t) => {
+	const f = await fixture(t, { startWithTool: true });
+	if (!f) return;
+	const other = await f.otherAgent();
+	assert.equal(paneReport(await f.send("pi_a = 1")), undefined);
+	// An agent that has never seen the pane gets its recent text first.
+	const firstOther = paneReport(await other.send("pi_b = 3"));
+	assert.match(firstOther, /^This agent has not seen this session's pane before; its recent text, before this submission/);
+	assert.match(firstOther, /pi_a = 1/);
+	// Another agent's send is reported, not taken as seen.
+	assert.match(paneReport(await f.send("print(pi_b)")), /pi_b = 3/);
+	// Neither is the user's typing, even after a /repl command runs code.
+	await typeAtPrompt(f, "pi_human = 73");
+	await paneSettles(f, /pi_human = 73\n>>>$/m);
+	await f.repl("env");
+	const afterEnv = paneReport(await f.send("print(pi_human)"));
+	assert.match(afterEnv, /\n>>> pi_human = 73\n/);
+	assert.match(afterEnv, /sys\.executable=/);
+	assert.match(paneReport(await other.send("print(pi_human + 1)")), /\n>>> pi_human = 73\n/);
+	// A new conversation in the same process has not seen what this one was told.
+	const conversation = await f.otherAgent({ sameFactory: true });
+	assert.match(paneReport(await conversation.send("print(2)")), /^This agent has not seen this session's pane before[\s\S]*pi_human = 73/);
+});
+
+test("long output lines and PI_REPL_PANE_ACTIVITY=off", { timeout: 60000 }, async (t) => {
+	const f = await fixture(t, { startWithTool: true });
+	if (!f) return;
+	await f.send("print('X' * 280000)", { echoMode: "off" });
+	assert.equal(paneReport(await f.send("print('quiet')")), undefined);
+	// More lines than the capture holds: the send's loader line leaves it, so
+	// repeated output must not pass for where the send ended.
+	await f.send("print('\\n'.join(['padding'] * 5200 + ['one', 'two', 'three', 'four']))", { echoMode: "off", timeoutMs: 30000 });
+	await typeAtPrompt(f, "pi_repeat = 3; print('one\\ntwo\\nthree\\nfour')");
+	await paneSettles(f, /pi_repeat = 3[^\n]*\none\ntwo\nthree\nfour\n>>>$/m);
+	const lost = paneReport(await f.send("print(pi_repeat)"));
+	assert.match(lost, /^This agent's last send is no longer in the pane's capture/);
+	assert.match(lost, /pi_repeat = 3; print/);
+	assert.equal(paneReport(await f.send("print('quiet again')")), undefined);
+	const previous = process.env.PI_REPL_PANE_ACTIVITY;
+	process.env.PI_REPL_PANE_ACTIVITY = "off";
+	t.after(() => {
+		if (previous === undefined) delete process.env.PI_REPL_PANE_ACTIVITY;
+		else process.env.PI_REPL_PANE_ACTIVITY = previous;
+	});
+	await typeAtPrompt(f, "pi_private = 5");
+	await paneSettles(f, /pi_private = 5\n>>>$/m);
+	const quiet = await f.send("print(pi_private)");
+	assert.equal(paneReport(quiet), undefined);
+	assert.equal(quiet.details.paneActivity, undefined);
+	const status = (await f.status()).content[0].text;
+	assert.doesNotMatch(status, /PI_REPL_PANE_ACTIVITY|Pane text since/);
+});
+
 test("a send pins its pane ID even if a lower-numbered window appears during execution", { timeout: 30000 }, async (t) => {
 	const f = await fixture(t, { index: 1 });
 	if (!f) return;
@@ -784,7 +891,9 @@ for (const mode of ["timeout", "abort", "session-ended"]) {
 		if (mode !== "session-ended") {
 			const result = await f.send("print('next request')");
 			assert.match(result.content[0].text, /Output:\nnext request/);
-			assert.doesNotMatch(result.content[0].text, /late result/);
+			// The late output is not this send's, but its report shows it.
+			assert.doesNotMatch(result.content[0].text.split("Output:\n")[1], /late result/);
+			assert.match(result.content[0].text.split("Submitted code:")[0], /late result/);
 		}
 	});
 }
@@ -1007,7 +1116,9 @@ for (const runtime of ["ruby", "java"]) {
 			await f.tmux("send-keys", "-t", `${f.sessionName}:^`, "C-m");
 			const shared = await f.send(runtime === "ruby" ? "pi_human_value" : "System.out.println(pi_human_value);");
 			assert.match(shared.content[0].text.split("Output:\n")[1], /51/);
-			assert.doesNotMatch(shared.content[0].text, /──|│|=> nil/);
+			assert.doesNotMatch(shared.content[0].text.split("Submitted code:")[1], /──|│|=> nil/);
+			// The direct input is reported, apart from the send's own output.
+			assert.match(shared.content[0].text.split("Submitted code:")[0], /^Pane text since this agent's last send[\s\S]*pi_human_value = pi_value \+ 10/);
 			status = (await f.status()).details[runtime];
 			assert.equal(status.recordEntries.length, 3);
 			assert.equal(status.recordEntries.at(-1).status, "captured");
@@ -1463,7 +1574,9 @@ for (const runtime of ["ghci", "ruby", "java"]) {
 			if (mode !== "session-ended") {
 				const next = await f.send({ ruby: 'puts "next request"', java: 'System.out.println("next request");', ghci: 'putStrLn "next request"' }[runtime]);
 				assert.match(next.content[0].text, /next request/);
-				assert.doesNotMatch(next.content[0].text, /late result/);
+				// The late output is not this send's, but its report shows it.
+				assert.doesNotMatch(next.content[0].text.split("Output:\n")[1], /late result/);
+				assert.match(next.content[0].text.split("Submitted code:")[0], /late result/);
 			}
 		});
 	}

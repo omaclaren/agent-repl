@@ -114,7 +114,7 @@ These are pi-repl's `/repl` commands, and the output is pi-repl's. The [pi-repl 
 |------|-------------|
 | `repl_start` | Start or reuse a session with an explicit runtime and wait for a normal prompt |
 | `repl_status` | Report which sessions are running, with their paths and recent output |
-| `repl_send` | Run code in a running session and return the submitted code and output |
+| `repl_send` | Run code in a running session and return the submitted code and output, after any pane text the agent hasn't seen |
 
 `repl_send` never starts a session, and stopping one is left to you. The tool descriptions are pi-repl's, with its guidance for agents appended. Claude Code limits an MCP tool description to 2,048 characters, so guidance about choosing a runtime, and the notes for particular runtimes, are attached to the `target` parameter instead. Arguments are checked against pi-repl's parameter schemas, as Pi checks them, before a tool runs.
 
@@ -132,9 +132,15 @@ An agent can also pass `echoMode` for a single `repl_send`. Full mode keeps long
 
 Entries in the clean record, and in `agent-repl export`, are labelled with the name the agent gives when it connects: `Claude Code` and `Codex` name themselves, and other agents are labelled with whatever name they send. To choose the label yourself, set `PI_REPL_AGENT_LABEL` in the server's environment, as for the echo setting. OpenCode 2 identifies itself only as `cli`, so the OpenCode configuration above sets the label. Submissions from Pi are labelled `Pi`.
 
+## What you type in a session
+
+`repl_send` tells the agent what appeared in the pane since its own last send, before its new code: what you typed at the prompt, other agents' or Pi's sends, and output that arrived later. Its first send to a session it hasn't seen shows the pane's recent text, and `repl_status` previews the same text. These reports are bounded, are labelled as untrusted terminal text, and never enter the clean record.
+
+That text, including anything you type, reaches the agent and its model provider. To stop it, set `PI_REPL_PANE_ACTIVITY=off` in the server's environment, as for the echo setting. It stops reports while it is set but does not erase the pane's history. The MCP server can't tell when an agent clears or compacts its own context, so after that the agent may lack pane text it was shown before.
+
 ## Privacy and safety
 
-An agent's code runs in your REPL with your permissions. Whether the agent asks before calling a tool is decided by the agent's own permission settings. Anyone who can reach your tmux server can see and type into these sessions.
+An agent's code runs in your REPL with your permissions, and it is shown what you type in a session (see above). Whether the agent asks before calling a tool is decided by the agent's own permission settings. Anyone who can reach your tmux server can see and type into these sessions.
 
 pi-repl writes submitted code to private temporary files (mode `0600`, in a directory only you can read) and removes them after each run. The raw session log and the clean record are kept in similar private directories under your temporary directory. The log is not deleted automatically; the clean record keeps the most recent 300 submissions. `PI_REPL_CONTROL_ROOT` moves the temporary code files to another directory, which must be owned by you with mode `0700`.
 

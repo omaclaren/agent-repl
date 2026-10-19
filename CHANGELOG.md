@@ -4,6 +4,14 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-10-20
+
+### Added
+- `repl_send` starts its result with the pane text the agent hasn't seen since its own last send, such as what you typed at the prompt, and `repl_status` previews it. Set `PI_REPL_PANE_ACTIVITY=off` in the server's environment to turn this off. From pi-repl 0.9.0.
+
+### Changed
+- Generated from pi-repl 0.9.0.
+
 ## [0.1.6] — 2026-10-19
 
 ### Fixed
