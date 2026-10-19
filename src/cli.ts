@@ -6,6 +6,7 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { attachArgs } from "./attach.js";
 import { hostContext, loadPiRepl, type Level } from "./host.js";
 import { runMcpServer } from "./mcp.js";
 import { forAgentRepl } from "./text.js";
@@ -59,9 +60,7 @@ export function attachTarget(messages: Captured[]): string | undefined {
 }
 
 function attachTerminal(sessionName: string): number {
-	// Inside tmux, switch this client to the session instead of nesting tmux.
-	const args = process.env.TMUX ? ["switch-client", "-t", sessionName] : ["attach", "-t", sessionName];
-	return spawnSync("tmux", args, { stdio: "inherit" }).status ?? 1;
+	return spawnSync("tmux", attachArgs(sessionName, Boolean(process.env.TMUX)), { stdio: "inherit" }).status ?? 1;
 }
 
 async function attach(runtime: string, cwd: string): Promise<void> {

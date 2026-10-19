@@ -4,6 +4,11 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+## [0.1.6] — 2026-10-19
+
+### Fixed
+- `agent-repl attach`, and starting a runtime in a terminal, pass `-u` to tmux. In a terminal without a UTF-8 locale (`LANG` unset, as in Muxy), non-ASCII output such as λ or é showed as underscores.
+
 ## [0.1.5] — 2026-10-19
 
 ### Changed
