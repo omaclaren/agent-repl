@@ -12,7 +12,8 @@ const paneFormat = "#{pid}\t#{session_id}\t#{session_name}\t#{session_created}\t
 export function parseStopProcessTable(text) {
 	return text.split("\n").filter((line) => line.trim()).map((line) => {
 		const f = line.trim().split(/\s+/);
-		if (f.length !== 11 || !f.slice(0, 4).every((v) => /^\d+$/.test(v) && Number.isSafeInteger(Number(v)))) throw new Error("Could not parse process ownership data; refusing unsafe shutdown.");
+		// macOS lists processes of `nobody` with uid -2; it never matches ours.
+		if (f.length !== 11 || !f.slice(0, 4).every((v, i) => (i === 3 ? /^-?\d+$/ : /^\d+$/).test(v) && Number.isSafeInteger(Number(v)))) throw new Error("Could not parse process ownership data; refusing unsafe shutdown.");
 		return { pid: Number(f[0]), ppid: Number(f[1]), pgid: Number(f[2]), uid: Number(f[3]), tty: f[4], startedAt: f.slice(5, 10).join(" "), state: f[10] };
 	});
 }
@@ -152,9 +153,16 @@ export class SessionStopProcesses {
 	}
 }
 
-/** Explicit stop only. Never used by send, startup, reload, or shutdown hooks. */
-export async function stopVerifiedReplSession({ tmux, sessionName, snapshot = readStopProcessTable, signal = (pid, value) => process.kill(pid, value), currentPid = process.pid, uid = process.getuid?.(), graceMs = 500, termMs = 1000, killMs = 2000, findMarked = findOwnedGnuplotProcesses, snapshotSockets = snapshotGnuplotSockets, cleanupSockets = cleanupGnuplotSockets }) {
-	if (typeof uid !== "number" || !/^pi-repl-(python|julia|r|ghci|clojure|ruby|java|octave|matlab|gnuplot|cpp)$/.test(sessionName)) throw new Error("Verified REPL shutdown requires a supported local Unix session.");
+export const PI_REPL_STOP_SESSION_NAME = /^pi-repl-(python|julia|r|ghci|clojure|ruby|java|octave|matlab|gnuplot|cpp)$/;
+
+/**
+ * Explicit stop only. Never used by send, startup, reload, or shutdown hooks.
+ * sessionNamePattern names the sessions this host owns; pi-studio passes its own.
+ */
+export async function stopVerifiedReplSession({ tmux, sessionName, sessionNamePattern = PI_REPL_STOP_SESSION_NAME, snapshot = readStopProcessTable, signal = (pid, value) => process.kill(pid, value), currentPid = process.pid, uid = process.getuid?.(), graceMs = 500, termMs = 1000, killMs = 2000, findMarked = findOwnedGnuplotProcesses, snapshotSockets = snapshotGnuplotSockets, cleanupSockets = cleanupGnuplotSockets }) {
+	// A global or sticky pattern keeps state between tests; refuse it rather than misjudge a name.
+	if (!(sessionNamePattern instanceof RegExp) || sessionNamePattern.global || sessionNamePattern.sticky) throw new Error("Verified REPL shutdown needs a plain session-name pattern.");
+	if (typeof uid !== "number" || typeof sessionName !== "string" || !sessionNamePattern.test(sessionName)) throw new Error("Verified REPL shutdown requires a supported local Unix session.");
 	const panes = await readPanes(tmux);
 	const selected = panes.filter((p) => p.sessionName === sessionName);
 	if (!selected.length) throw new Error("The selected session ended or changed before shutdown; no processes were signalled.");

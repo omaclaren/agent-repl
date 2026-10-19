@@ -4,6 +4,15 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-10-19
+
+### Changed
+- Generated from pi-repl 0.8.2.
+
+### Fixed
+- `agent-repl stop` no longer refuses to run on macOS when a process of `nobody` (uid -2) is running.
+- IPython shows an expression's value once, as `Out[N]: …`. It used to be printed again as a bare `repr`.
+
 ### Documentation
 - Set `PI_REPL_AGENT_LABEL` in the OpenCode configuration example: OpenCode 2 identifies itself to MCP servers only as `cli`.
 
