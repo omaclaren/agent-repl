@@ -4,6 +4,14 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+## [0.1.4] — 2026-10-19
+
+### Changed
+- Generated from pi-repl 0.8.5.
+
+### Fixed
+- Julia no longer leaves copies of a wrapped submission line in the output, as it did in panes narrower than the `include(...)` line, such as a detached session's default 80 columns.
+
 ## [0.1.3] — 2026-10-19
 
 ### Changed
