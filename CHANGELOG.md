@@ -4,6 +4,14 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+## [0.1.5] — 2026-10-19
+
+### Changed
+- Generated from pi-repl 0.8.6.
+
+### Fixed
+- The 0.1.3 done-marker footer no longer waits without limit for its Node helper. In Julia and R, a Node startup hook (`NODE_OPTIONS`) that kept Node running held the cell's completion indefinitely. In Clojure, an interrupt while the footer waited left the tmux query running.
+
 ## [0.1.4] — 2026-10-19
 
 ### Changed

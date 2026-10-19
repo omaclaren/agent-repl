@@ -1162,6 +1162,96 @@ for (const runtime of ["ghci", "ruby", "java", "python", "ipython", "julia", "r"
 	}
 }
 
+for (const runtime of ["python", "julia", "r"]) {
+	test(`${runtime} footer bounds a Node helper that never finishes`, {
+		timeout: 60000, skip: runtime !== "python" && !(optionalRuntimes.has("all") || optionalRuntimes.has(runtime)),
+	}, async (t) => {
+		const f = await fixture(t, { runtime });
+		if (!f) return;
+		// A startup hook blocks Node before the query runs, so only a bound on
+		// the helper itself ends it.
+		const pidPath = join(f.cwd, "helper.pid");
+		const hook = join(f.cwd, "stall.cjs");
+		writeFileSync(hook, `require("node:fs").writeFileSync(${JSON.stringify(pidPath)}, String(process.pid));\nAtomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 30000);\n`);
+		const option = JSON.stringify(`--require=${hook}`);
+		const code = {
+			python: `import os; os.environ["NODE_OPTIONS"] = ${option}; print("stalled helper", end="")`,
+			julia: `ENV["NODE_OPTIONS"] = ${option}; print("stalled helper")`,
+			r: `Sys.setenv(NODE_OPTIONS = ${option}); cat("stalled helper")`,
+		}[runtime];
+		const result = await f.send(code, { timeoutMs: 20000 });
+		assert.equal(result.content[0].text.split("Output:\n")[1], "stalled helper");
+		const pane = await f.tmux("capture-pane", "-p", "-J", "-t", `${f.sessionName}:^`, "-S", "-80");
+		assert.match(pane, /── output ──\nstalled helper\n── done/);
+		const pid = Number(readFileSync(pidPath, "utf8").trim());
+		assert.ok(Number.isSafeInteger(pid) && pid > 0);
+		await eventually(() => {
+			try { process.kill(pid, 0); return false; }
+			catch (error) { if (error.code === "ESRCH") return true; throw error; }
+		}, 5000);
+		assert.equal(readdirSync(process.env.PI_REPL_CONTROL_ROOT).length, 0);
+	});
+}
+
+test("clojure footer keeps waiting for its query when the thread is interrupted", {
+	timeout: 30000, skip: !(optionalRuntimes.has("all") || optionalRuntimes.has("clojure")),
+}, async (t) => {
+	const f = await fixture(t, { runtime: "clojure" });
+	if (!f) return;
+	const realTmux = binary("tmux");
+	const pidPath = join(f.cwd, "query.pid");
+	writeFileSync(join(f.cwd, "bin", "tmux"), `#!/bin/sh\nif [ -n "\${TMUX_PANE:-}" ]; then\n  echo $$ > ${quote(pidPath)}\n  exec /bin/sleep 10\nfi\nexec ${quote(realTmux)} "$@"\n`, { mode: 0o700 });
+	// Interrupts the evaluating thread once the footer's query is running.
+	const code = `(let [t (Thread/currentThread)] (future (while (not (.exists (java.io.File. ${JSON.stringify(pidPath)}))) (Thread/sleep 5)) (.interrupt t)) (print "interrupted wait"))`;
+	const result = await f.send(code, { timeoutMs: 8000 });
+	assert.equal(result.content[0].text.split("Output:\n")[1], "interrupted wait");
+	// Node ends the hung query itself, before the footer goes on, so the
+	// query does not outlive the send.
+	const pid = Number(readFileSync(pidPath, "utf8").trim());
+	assert.throws(() => process.kill(pid, 0), { code: "ESRCH" });
+	// The interrupt is still pending for the code that follows.
+	const pending = await f.send("(println (Thread/interrupted))");
+	assert.equal(pending.content[0].text.split("Output:\n")[1], "true");
+	assert.equal(readdirSync(process.env.PI_REPL_CONTROL_ROOT).length, 0);
+});
+
+test("julia footer keeps waiting for its query when the task is interrupted", {
+	timeout: 30000, skip: !(optionalRuntimes.has("all") || optionalRuntimes.has("julia")),
+}, async (t) => {
+	const f = await fixture(t, { runtime: "julia" });
+	if (!f) return;
+	const realTmux = binary("tmux");
+	const pidPath = join(f.cwd, "query.pid");
+	writeFileSync(join(f.cwd, "bin", "tmux"), `#!/bin/sh\nif [ -n "\${TMUX_PANE:-}" ]; then\n  echo $$ > ${quote(pidPath)}\n  exec /bin/sleep 10\nfi\nexec ${quote(realTmux)} "$@"\n`, { mode: 0o700 });
+	// Interrupts the evaluating task once the footer's query is running.
+	const code = `let task = current_task()\n    @async begin\n        while !isfile(${JSON.stringify(pidPath)})\n            sleep(0.005)\n        end\n        Base.throwto(task, InterruptException())\n    end\n    print("interrupted wait")\nend`;
+	const result = await f.send(code, { timeoutMs: 8000 });
+	assert.equal(result.content[0].text.split("Output:\n")[1], "interrupted wait");
+	// Node ends the hung query itself, before the footer goes on.
+	const pid = Number(readFileSync(pidPath, "utf8").trim());
+	assert.throws(() => process.kill(pid, 0), { code: "ESRCH" });
+	assert.equal(readdirSync(process.env.PI_REPL_CONTROL_ROOT).length, 0);
+});
+
+test("julia footer closes its pipe when a child of the helper holds it open", {
+	timeout: 60000, skip: !(optionalRuntimes.has("all") || optionalRuntimes.has("julia")),
+}, async (t) => {
+	const f = await fixture(t, { runtime: "julia" });
+	if (!f) return;
+	// A startup hook leaves a child with the helper's stdout, so the footer's
+	// read never sees the end of it.
+	const hook = join(f.cwd, "hold.cjs");
+	writeFileSync(hook, `require("node:child_process").spawn("/bin/sleep", ["30"], { stdio: ["ignore", "inherit", "ignore"] }).unref();\n`);
+	const openFiles = async () => Number((await f.send('GC.gc(true); println(length(readdir("/dev/fd")))')).content[0].text.split("Output:\n")[1]);
+	await openFiles();
+	const before = await openFiles();
+	const held = await f.send(`ENV["NODE_OPTIONS"] = ${JSON.stringify(`--require=${hook}`)}; print("pipe held")`, { timeoutMs: 15000 });
+	assert.equal(held.content[0].text.split("Output:\n")[1], "pipe held");
+	await f.send('delete!(ENV, "NODE_OPTIONS"); nothing');
+	assert.equal(await openFiles(), before);
+	assert.equal(readdirSync(process.env.PI_REPL_CONTROL_ROOT).length, 0);
+});
+
 test("ghci shell fallback preserves the footer gap if Node cannot start", {
 	timeout: 30000, skip: !(optionalRuntimes.has("all") || optionalRuntimes.has("ghci")),
 }, async (t) => {
