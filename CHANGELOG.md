@@ -4,6 +4,14 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+## [0.1.3] — 2026-10-19
+
+### Changed
+- Generated from pi-repl 0.8.4.
+
+### Fixed
+- In the Summary and Full displays, output that doesn't end its line no longer runs into the done marker in Python, IPython, Julia, R and Clojure. The marker then stayed in the clean output, as in `c── done · id: … ──`.
+
 ## [0.1.2] — 2026-10-19
 
 ### Changed
