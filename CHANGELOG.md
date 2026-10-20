@@ -4,6 +4,16 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+## [0.3.4] — 2026-10-21
+
+### Changed
+- Generated from pi-repl 0.10.4.
+
+### Fixed
+- Echo Off: output that doesn't end its line is no longer lost, or followed by the loader line in the next result.
+- GHCi: the footer's Node helper runs with a five-second alarm timeout, and Ctrl-C while it waits no longer leaves the send unfinished.
+- Java: a footer that throws no longer leaves the send unfinished.
+
 ## [0.3.3] — 2026-10-20
 
 ### Changed
