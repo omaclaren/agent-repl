@@ -4,6 +4,11 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+## [0.3.2] — 2026-10-20
+
+### Changed
+- Generated from pi-repl 0.10.2. Its stop helper can be told which of a host's own sessions are gnuplot sessions; agent-repl's behaviour is unchanged.
+
 ## [0.3.1] — 2026-10-20
 
 ### Changed
