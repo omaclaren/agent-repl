@@ -4,6 +4,16 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-10-20
+
+### Changed
+- Generated from pi-repl 0.10.1.
+
+### Fixed
+- Ruby: Ctrl-C while a send's footer waits no longer leaves the send unfinished.
+- Octave: stopping a session no longer leaves an `octave-workspace` file in its working directory.
+- Octave and MATLAB: the footer's Node helper runs with a five-second alarm timeout, and in Octave Ctrl-C while it waits no longer leaves the send unfinished.
+
 ## [0.3.0] — 2026-10-20
 
 ### Changed
