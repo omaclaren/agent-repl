@@ -4,6 +4,14 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+## [0.3.3] — 2026-10-20
+
+### Changed
+- Generated from pi-repl 0.10.3.
+
+### Fixed
+- gnuplot: stopping a session no longer fails on a Mac that runs processes as `nobody` (UID −2).
+
 ## [0.3.2] — 2026-10-20
 
 ### Changed
