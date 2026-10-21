@@ -4,6 +4,14 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+## [0.3.5] — 2026-10-21
+
+### Changed
+- Generated from pi-repl 0.10.5.
+
+### Fixed
+- GHCi, Octave and MATLAB: the footer's Node helper is stopped after 5 s by a small Node supervisor instead of perl's `alarm`, so a Node startup hook that catches SIGALRM can no longer hold up the send. Perl is no longer needed.
+
 ## [0.3.4] — 2026-10-21
 
 ### Changed
