@@ -4,6 +4,12 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+## [0.4.2] — 2026-10-30
+
+### Changed
+- Generated from pi-repl 0.11.2.
+- `agent-repl send` takes every runtime again, and waits until the code is done, however long it runs, so its output is recorded as its own and no other send can take it. That fixes 0.4.0's problem, which 0.4.1 avoided by taking only `lfortran`. After 20 seconds (`--notice <seconds>`) it says the code is still running. If another send has the session, it waits up to 60 seconds (`--lease-wait <seconds>`) for it, and gives up without sending. Ctrl-C before the code is sent cancels it; after that, the first press keeps waiting and a second stops waiting, with a warning. It sends nothing it can't record, and refuses empty code, invalid UTF-8, and code over 200,000 characters. `agent-repl env` waits the same way.
+
 ## [0.4.1] — 2026-10-29
 
 ### Fixed
