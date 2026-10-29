@@ -98,7 +98,7 @@ New sessions start in the MCP server's working directory, which is wherever the 
 | `agent-repl status [runtime]` | Show running sessions |
 | `agent-repl attach [runtime]` | Attach to a session in this terminal |
 | `agent-repl env [python]` | Show the Python session's interpreter and environment |
-| `agent-repl send [runtime]` | Run code from stdin in a running session, as `repl_send` does, and print the result |
+| `agent-repl send lfortran` | Run Fortran from stdin in the LFortran session, as `repl_send` does, and print the result |
 | `agent-repl input <text>` | Answer the READ that an LFortran cell sent through agent-repl is waiting on |
 | `agent-repl export [runtime]` | Write the session's clean record to a Markdown file in the current directory |
 | `agent-repl stop [runtime]` | Stop a session, verifying that its processes exit |

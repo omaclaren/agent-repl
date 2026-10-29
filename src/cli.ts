@@ -21,7 +21,7 @@ Usage:
   agent-repl status [runtime]    Show running sessions
   agent-repl attach [runtime]    Open a session in this terminal
   agent-repl env [python]        Show the Python session's interpreter and environment
-  agent-repl send [runtime]      Run code from stdin in a running session
+  agent-repl send lfortran       Run Fortran from stdin in the LFortran session
   agent-repl input <text>        Answer the READ an LFortran cell from agent-repl waits on
   agent-repl export [runtime]    Write the session's record of submissions to a file
   agent-repl stop [runtime]      Stop a session
@@ -88,9 +88,17 @@ async function main(argv: string[]): Promise<void> {
 	}
 	if (command === "attach") { await attach(rest.join(" "), cwd); return; }
 	if (command === "send") {
+		// A send to a pane session holds its lease only while this process waits; one that
+		// outlasts the wait would leave its late output to the next send. LFortran's helper
+		// matches output to cells, so its sends are safe.
+		if (rest[0]?.toLowerCase() !== "lfortran") {
+			console.error("agent-repl send takes only lfortran for now: a send to another runtime could end before its cell, and the session's next send would record that cell's late output. Run code there from an agent with repl_send, or at the session's prompt (agent-repl attach <runtime>).");
+			process.exitCode = 1;
+			return;
+		}
 		// pi-repl's /repl send takes the code from the lines below the command; here it comes from stdin.
 		if (process.stdin.isTTY) {
-			console.error("Pipe the code in, for example: echo 'print(1)' | agent-repl send python");
+			console.error("Pipe the code in, for example: echo 'print *, 42' | agent-repl send lfortran");
 			process.exitCode = 1;
 			return;
 		}

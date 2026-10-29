@@ -99,6 +99,14 @@ test("CLI: status, attach instructions and stop use the same session", { skip },
 	assert.equal(sent.isError, true, "repl_send must not start a stopped session");
 });
 
+test("CLI: send takes only lfortran, and sends nothing to another runtime", { skip }, () => {
+	for (const args of [["send"], ["send", "python"], ["send", "julia"]]) {
+		const result = spawnSync(process.execPath, [cli, ...args], { cwd: project, env, encoding: "utf8", timeout: 30000, input: "print(1)\n" });
+		assert.equal(result.status, 1, args.join(" "));
+		assert.match(result.stderr, /^agent-repl send takes only lfortran for now/);
+	}
+});
+
 test("CLI: unknown runtimes fail with pi-repl's message", { skip }, () => {
 	const result = run("cobol");
 	assert.equal(result.status, 1);
