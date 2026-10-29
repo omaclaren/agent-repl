@@ -11,11 +11,11 @@ const PHRASES: [string, string][] = [
 	["pi-repl requires tmux", "agent-repl requires tmux"],
 	["/repl stop lfortran (agent-repl stop lfortran outside Pi)", "agent-repl stop lfortran"],
 	// /repl send takes its code from the lines below it; agent-repl send takes it from stdin.
-	// agent-repl send takes only lfortran for now (see cli.ts).
-	["/repl send [runtime], with the code on the lines below it (Shift+Enter starts a new line).", "/repl send lfortran, with the code on stdin."],
-	["/repl send [runtime], with the code on the lines below it", "/repl send lfortran, with the code on stdin"],
+	// /repl send takes its code from the lines below it; agent-repl send takes it from stdin, and waits until it's done.
+	["/repl send [runtime], with the code on the lines below it (Shift+Enter starts a new line).", "/repl send [runtime], with the code on stdin."],
+	["/repl send [runtime], with the code on the lines below it", "/repl send [runtime], with the code on stdin"],
 	["/repl send [runtime] sends the code on the lines below it to that running session (Python by default), as repl_send does; its result goes into the conversation, where the agent sees it too. Shift+Enter starts a new line",
-		"/repl send lfortran sends the code on stdin to the LFortran session, as repl_send does, and prints the result"],
+		"/repl send [runtime] sends the code on stdin to that running session (Python by default), waits until it's done, and prints the result"],
 ];
 
 // "/repl julia or /lab julia", "/repl R or /repl r, or /lab R or /lab r",

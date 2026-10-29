@@ -9,6 +9,7 @@ import { splitArgs } from "./args.js";
 import { attachArgs } from "./attach.js";
 import { hostContext, loadPiRepl, type Level } from "./host.js";
 import { runMcpServer } from "./mcp.js";
+import { CancelledSend, envSettled, parseSendArgs, readCode, SendRefused, sendFromStdin, type SettledResult } from "./send.js";
 import { forAgentReplOutsideFences } from "./text.js";
 
 const VERSION = (JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string }).version;
@@ -21,7 +22,7 @@ Usage:
   agent-repl status [runtime]    Show running sessions
   agent-repl attach [runtime]    Open a session in this terminal
   agent-repl env [python]        Show the Python session's interpreter and environment
-  agent-repl send lfortran       Run Fortran from stdin in the LFortran session
+  agent-repl send [runtime]      Run code from stdin in a running session, and wait until it's done
   agent-repl input <text>        Answer the READ an LFortran cell from agent-repl waits on
   agent-repl export [runtime]    Write the session's record of submissions to a file
   agent-repl stop [runtime]      Stop a session
@@ -31,6 +32,12 @@ matlab, gnuplot, cpp, and lfortran (experimental; needs LFortran's main
 branch). Sessions are the tmux sessions pi-repl uses (pi-repl-python,
 pi-repl-julia, ...), shared by every agent and terminal.
 
+agent-repl send waits however long the code runs, so that its output is recorded
+and no other send takes it. --notice <seconds> (default 20) says when to report
+that it's still running; --lease-wait <seconds> (default 60) is how long to wait
+for another send to finish first. Ctrl-C before the code is sent cancels; after,
+the first press keeps waiting, and a second stops waiting, which is unsafe.
+
 Environment:
   PI_REPL_ECHO_MODE     off, summary (default) or full: how much submitted code
                         the MCP server echoes into the REPL pane
@@ -39,6 +46,20 @@ Environment:
   PI_REPL_CONTROL_ROOT  directory for the private files used to submit code`;
 
 const SUBCOMMANDS = new Set(["status", "env", "stop", "attach", "export", "echo", "help", "input"]);
+
+/** Prints a settled send's result, or why it wasn't sent; Ctrl-C before sending exits 130. */
+async function printSettled(run: () => Promise<SettledResult>): Promise<void> {
+	try {
+		const result = await run();
+		console.log(forAgentReplOutsideFences(result.text));
+		process.exitCode = result.exitCode;
+	} catch (error) {
+		console.error(forAgentReplOutsideFences(error instanceof Error ? error.message : String(error)));
+		process.exitCode = error instanceof CancelledSend ? 130 : 1;
+	}
+}
+
+const notifyStderr = (message: string) => console.error(forAgentReplOutsideFences(message));
 
 interface Captured { message: string; level: Level }
 
@@ -88,21 +109,25 @@ async function main(argv: string[]): Promise<void> {
 	}
 	if (command === "attach") { await attach(rest.join(" "), cwd); return; }
 	if (command === "send") {
-		// A send to a pane session holds its lease only while this process waits; one that
-		// outlasts the wait would leave its late output to the next send. LFortran's helper
-		// matches output to cells, so its sends are safe.
-		if (rest[0]?.toLowerCase() !== "lfortran") {
-			console.error("agent-repl send takes only lfortran for now: a send to another runtime could end before its cell, and the session's next send would record that cell's late output. Run code there from an agent with repl_send, or at the session's prompt (agent-repl attach <runtime>).");
-			process.exitCode = 1;
-			return;
-		}
 		// pi-repl's /repl send takes the code from the lines below the command; here it comes from stdin.
 		if (process.stdin.isTTY) {
-			console.error("Pipe the code in, for example: echo 'print *, 42' | agent-repl send lfortran");
+			console.error("Pipe the code in, for example: echo 'print(1)' | agent-repl send python");
 			process.exitCode = 1;
 			return;
 		}
-		await runReplCommand(`send ${rest.join(" ")}\n${readFileSync(0, "utf8")}`, cwd, true);
+		// LFortran's helper matches output to cells and goes on recording a cell after its sender stops waiting.
+		if (rest[0]?.toLowerCase() === "lfortran") {
+			await runReplCommand(`send ${rest.join(" ")}\n${readFileSync(0, "utf8")}`, cwd, true);
+			return;
+		}
+		await printSettled(async () => {
+			const sendArgs = parseSendArgs(rest);
+			return sendFromStdin(cwd, sendArgs, await readCode(process.stdin), notifyStderr);
+		});
+		return;
+	}
+	if (command === "env" && (rest.length === 0 || /^i?python$/i.test(rest[0]) && rest.length === 1)) {
+		await printSettled(() => envSettled(cwd, notifyStderr));
 		return;
 	}
 	if (SUBCOMMANDS.has(command)) { await runReplCommand(args.join(" "), cwd, true); return; }

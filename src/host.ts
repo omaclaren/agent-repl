@@ -7,6 +7,7 @@ import { execCommand, type CommandDefinition, type ExtensionAPI, type ExtensionC
 export type Level = "info" | "warning" | "error";
 
 export interface PiReplHost {
+	api: ExtensionAPI;
 	tools: Map<string, ToolDefinition>;
 	commands: Map<string, CommandDefinition>;
 }
@@ -26,7 +27,7 @@ export function loadPiRepl(): PiReplHost {
 		registerMessageRenderer: () => {},
 	};
 	registerPiRepl(api);
-	host = { tools, commands };
+	host = { api, tools, commands };
 	return host;
 }
 

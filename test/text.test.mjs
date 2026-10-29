@@ -18,7 +18,7 @@ test("pi-repl's command wording becomes agent-repl, without the /lab alias", () 
 		["Respect the current /repl echo setting; use echoMode='off'", "Respect the server's echo setting; use echoMode='off'"],
 		["Stop it with /repl stop lfortran (agent-repl stop lfortran outside Pi).", "Stop it with agent-repl stop lfortran."],
 		["To answer it from here: /repl input <text>", "To answer it from here: agent-repl input <text>"],
-		["Nothing to send. Usage: /repl send [runtime], with the code on the lines below it (Shift+Enter starts a new line).", "Nothing to send. Usage: agent-repl send lfortran, with the code on stdin."],
+		["Nothing to send. Usage: /repl send [runtime], with the code on the lines below it (Shift+Enter starts a new line).", "Nothing to send. Usage: agent-repl send [runtime], with the code on stdin."],
 	];
 	for (const [input, expected] of cases) assert.equal(forAgentRepl(input), expected);
 });

@@ -3,7 +3,7 @@
 // a temporary HOME, so the user's tmux sessions are never touched.
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -73,6 +73,63 @@ test("MCP: start a Python REPL, run code in it and report its status", { skip },
 	assert.match(text(status), /Latest clean entry: pi-repl · E2E Agent · /);
 });
 
+/** `agent-repl send` as a person runs it: code on stdin, stderr watched for the notice. */
+function cliSend(args, code) {
+	const child = spawn(process.execPath, [cli, "send", ...args], { cwd: project, env, stdio: ["pipe", "pipe", "pipe"] });
+	let stdout = "", stderr = "";
+	child.stdout.on("data", (data) => { stdout += data; });
+	child.stderr.on("data", (data) => { stderr += data; });
+	child.stdin.end(code);
+	const exited = new Promise((resolve) => child.on("exit", (code, signal) => resolve({ code, signal, stdout, stderr })));
+	const until = async (pattern) => {
+		const deadline = Date.now() + 20000;
+		while (!pattern.test(stderr)) {
+			if (Date.now() > deadline) throw new Error(`no ${pattern} on stderr: ${stderr}`);
+			await new Promise((resolve) => setTimeout(resolve, 50));
+		}
+	};
+	return { child, exited, until };
+}
+
+test("CLI: send waits past its notice until the code is done, and another send waits its turn", { skip, timeout: 60000 }, async () => {
+	const send = cliSend(["python", "--notice", "1"], "import time\ntime.sleep(2.5)\nprint('CLI_LATE')\n");
+	await send.until(/^Still running in pi-repl-python\. Waiting so its output is recorded and no other send picks it up\./m);
+	// An agent's send meanwhile waits for the lease, and gets only its own output.
+	const other = await client.callTool({ name: "repl_send", arguments: { code: "print('MCP_ONLY')" } });
+	const result = await send.exited;
+	assert.equal(result.code, 0, result.stderr);
+	assert.match(result.stdout, /^agent-repl send to pi-repl-python:\n\n```\n[\s\S]*Output:\nCLI_LATE\n```\n?$/);
+	assert.match(text(other), /Output:\nMCP_ONLY$/);
+	assert.doesNotMatch(text(other).split("Output:")[1], /CLI_LATE/);
+});
+
+test("CLI: env runs the Python inspection as a settled send", { skip, timeout: 60000 }, () => {
+	const env_ = spawnSync(process.execPath, [cli, "env"], { cwd: project, env, encoding: "utf8", timeout: 30000 });
+	assert.equal(env_.status, 0, env_.stderr);
+	assert.match(env_.stdout, /^Python\/IPython REPL environment:\nRuntime: python\nSession: pi-repl-python\n\nsys\.executable=/);
+});
+
+test("CLI: the first Ctrl-C keeps waiting; a second stops waiting, and says that's unsafe", { skip, timeout: 60000 }, async () => {
+	const kept = cliSend(["python", "--notice", "1"], "import time\ntime.sleep(3)\nprint('AFTER_CTRL_C')\n");
+	await kept.until(/^Still running/m);
+	kept.child.kill("SIGINT");
+	await kept.until(/^The code keeps running and this command is still waiting/m);
+	const finished = await kept.exited;
+	assert.equal(finished.code, 0, finished.stderr);
+	assert.match(finished.stdout, /Output:\nAFTER_CTRL_C/);
+
+	const stopped = cliSend(["python", "--notice", "1"], "import time\ntime.sleep(4)\n");
+	await stopped.until(/^Still running/m);
+	stopped.child.kill("SIGINT");
+	await stopped.until(/^The code keeps running/m);
+	stopped.child.kill("SIGINT");
+	const exited = await stopped.exited;
+	assert.equal(exited.code, 130);
+	assert.match(exited.stderr, /^Stopped waiting\. The code may still be running in pi-repl-python, and after 30 seconds another send may record its late output\.$/m);
+	// Its sleep ends before the next test stops the session.
+	await new Promise((resolve) => setTimeout(resolve, 4000));
+});
+
 test("CLI: status, attach instructions and stop use the same session", { skip }, async () => {
 	const status = run("status", "python");
 	assert.equal(status.status, 0, status.stderr);
@@ -99,11 +156,18 @@ test("CLI: status, attach instructions and stop use the same session", { skip },
 	assert.equal(sent.isError, true, "repl_send must not start a stopped session");
 });
 
-test("CLI: send takes only lfortran, and sends nothing to another runtime", { skip }, () => {
-	for (const args of [["send"], ["send", "python"], ["send", "julia"]]) {
-		const result = spawnSync(process.execPath, [cli, ...args], { cwd: project, env, encoding: "utf8", timeout: 30000, input: "print(1)\n" });
-		assert.equal(result.status, 1, args.join(" "));
-		assert.match(result.stderr, /^agent-repl send takes only lfortran for now/);
+test("CLI: send refuses empty or invalid code and bad options before anything is sent", { skip }, () => {
+	const send = (args, input) => spawnSync(process.execPath, [cli, "send", ...args], { cwd: project, env, timeout: 30000, input, encoding: "utf8" });
+	for (const [args, input, message] of [
+		[["python"], " \n", /^Nothing was sent: the code is empty\.$/m],
+		[["python"], Buffer.from([0xff, 0x0a]), /^Nothing was sent: the code isn't valid UTF-8\.$/m],
+		[["python"], "x".repeat(200_001), /^Nothing was sent: the code is longer than 200,000 characters\.$/m],
+		[["python", "--notice", "0"], "print(1)\n", /^--notice takes a number of seconds from 1 to 3600\.$/m],
+		[["python", "-c", "print(1)"], "print(1)\n", /^Unknown option for agent-repl send: -c$/m],
+	]) {
+		const result = send(args, input);
+		assert.equal(result.status, 1, `${args.join(" ")}: ${result.stdout}${result.stderr}`);
+		assert.match(result.stderr, message);
 	}
 });
 
