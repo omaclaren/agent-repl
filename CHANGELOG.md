@@ -4,6 +4,13 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+## [0.4.3] — 2026-10-30
+
+### Changed
+- Generated from pi-repl 0.11.3.
+- When an agent's code outlasts `repl_send`'s wait, its output is recorded when it finishes, and the session stays held until then; the result tells the agent not to send it again. The MCP server waits for such sends before it exits, saying so on stderr every minute. A client that kills it sooner (the MCP SDK allows about four seconds) leaves the send without an owner, and its lease goes stale 30 seconds later.
+- `agent-repl status` says which send holds a session.
+
 ## [0.4.2] — 2026-10-30
 
 ### Changed
