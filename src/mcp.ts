@@ -1,4 +1,4 @@
-// MCP server exposing pi-repl's tools (repl_start, repl_status, repl_send).
+// MCP server exposing pi-repl's tools (repl_start, repl_status, repl_send, repl_input).
 //
 // Pi shows a tool's description to the model and adds its prompt guidelines to
 // the system prompt. MCP has only the description, and some clients cap it
@@ -19,13 +19,13 @@ import { hostContext, loadPiRepl, type Level } from "./host.js";
 import type { ToolDefinition } from "./pi-compat/index.js";
 import { forAgentRepl } from "./text.js";
 
-export const INSTRUCTIONS = `agent-repl provides long-lived REPL sessions (Python/IPython, Julia, R, GHCi, Clojure, Ruby, Java, Octave, MATLAB, gnuplot and C++) running in tmux. The user can watch and type into the same session from a terminal, so treat it as shared state: inspect before changing it, and do not assume variables exist.
+export const INSTRUCTIONS = `agent-repl provides long-lived REPL sessions (Python/IPython, Julia, R, GHCi, Clojure, Ruby, Java, Octave, MATLAB, gnuplot, C++ and, experimentally, LFortran) running in tmux. The user can watch and type into the same session from a terminal, so treat it as shared state: inspect before changing it, and do not assume variables exist.
 
-Start or reuse a session with repl_start, choosing the runtime explicitly, then run code with repl_send. Use repl_status to check which sessions are running. Stopping or restarting a session is the user's decision; they can run \`agent-repl stop <runtime>\` in a terminal. To show the user the session, suggest \`agent-repl attach <runtime>\`.
+Start or reuse a session with repl_start, choosing the runtime explicitly, then run code with repl_send. Use repl_status to check which sessions are running. When an LFortran cell waits on a READ, answer it with repl_input. Stopping or restarting a session is the user's decision; they can run \`agent-repl stop <runtime>\` in a terminal. To show the user the session, suggest \`agent-repl attach <runtime>\`.
 
 These are the same tmux sessions pi-repl uses (pi-repl-python, pi-repl-julia, ...), so other agents and Pi may be using them too. Messages from these tools can mention pi-repl's Pi commands /repl and /lab; outside Pi the same command is \`agent-repl\` in a terminal (\`/repl stop python\` is \`agent-repl stop python\`).`;
 
-const TARGET_GUIDANCE = /^(?:In (?:GHCi|Clojure|Ruby|Java)|For (?:Octave|MATLAB|C\+\+|gnuplot))(?!\w)|\btarget='/;
+const TARGET_GUIDANCE = /^(?:In (?:GHCi|Clojure|Ruby|Java|LFortran)|For (?:Octave|MATLAB|C\+\+|gnuplot|LFortran))(?!\w)|\btarget='/;
 
 // Claude Code and Codex send a display title; OpenCode sends only its name.
 const CLIENT_NAMES: Record<string, string> = { opencode: "OpenCode" };

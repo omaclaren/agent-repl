@@ -9,6 +9,12 @@ const PHRASES: [string, string][] = [
 	["the same startup path as /repl and /lab", "the same startup path as agent-repl"],
 	["The same applies to /lab, ", "The same applies to "],
 	["pi-repl requires tmux", "agent-repl requires tmux"],
+	["/repl stop lfortran (agent-repl stop lfortran outside Pi)", "agent-repl stop lfortran"],
+	// /repl send takes its code from the lines below it; agent-repl send takes it from stdin.
+	["/repl send [runtime], with the code on the lines below it (Shift+Enter starts a new line).", "/repl send [runtime], with the code on stdin."],
+	["/repl send [runtime], with the code on the lines below it", "/repl send [runtime], with the code on stdin"],
+	["/repl send [runtime] sends the code on the lines below it to that running session (Python by default), as repl_send does; its result goes into the conversation, where the agent sees it too. Shift+Enter starts a new line",
+		"/repl send [runtime] sends the code on stdin to that running session (Python by default), as repl_send does, and prints the result"],
 ];
 
 // "/repl julia or /lab julia", "/repl R or /repl r, or /lab R or /lab r",
@@ -19,4 +25,29 @@ const COMMAND = /(^|[\s"'`(])\/(?:repl|lab)(?=[\s.,;:)"'`]|$)/gm;
 export function forAgentRepl(text: string): string {
 	for (const [from, to] of PHRASES) text = text.split(from).join(to);
 	return text.replace(LAB_ALTERNATIVES, "").replace(COMMAND, "$1agent-repl");
+}
+
+/**
+ * forAgentRepl for a command's output, except in its fenced blocks: pi-repl
+ * puts a send's result there, and a REPL's code and output stay as they are.
+ */
+export function forAgentReplOutsideFences(text: string): string {
+	const parts: string[] = [];
+	let prose: string[] = [];
+	let fence: string | undefined;
+	for (const line of text.split("\n")) {
+		if (fence === undefined && /^`{3,}$/.test(line)) {
+			if (prose.length) parts.push(forAgentRepl(prose.join("\n")));
+			prose = [];
+			fence = line;
+			parts.push(line);
+		} else if (fence !== undefined) {
+			parts.push(line);
+			if (line === fence) fence = undefined;
+		} else {
+			prose.push(line);
+		}
+	}
+	if (prose.length) parts.push(forAgentRepl(prose.join("\n")));
+	return parts.join("\n");
 }

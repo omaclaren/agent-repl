@@ -22,6 +22,8 @@ export function loadPiRepl(): PiReplHost {
 		exec: (command, args, options) => execCommand(command, args, options?.cwd ?? process.cwd(), options),
 		registerTool: tool => { tools.set(tool.name, tool as unknown as ToolDefinition); },
 		registerCommand: (name, command) => { commands.set(name, command); },
+		// Without sendMessage, pi-repl posts no messages, so nothing is drawn.
+		registerMessageRenderer: () => {},
 	};
 	registerPiRepl(api);
 	host = { tools, commands };

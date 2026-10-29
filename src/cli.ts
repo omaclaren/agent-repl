@@ -5,11 +5,11 @@
 //   agent-repl <args>         pi-repl's /repl command in a terminal, e.g. `agent-repl python`
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { splitArgs } from "./args.js";
 import { attachArgs } from "./attach.js";
 import { hostContext, loadPiRepl, type Level } from "./host.js";
 import { runMcpServer } from "./mcp.js";
-import { forAgentRepl } from "./text.js";
+import { forAgentReplOutsideFences } from "./text.js";
 
 const VERSION = (JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string }).version;
 
@@ -21,12 +21,15 @@ Usage:
   agent-repl status [runtime]    Show running sessions
   agent-repl attach [runtime]    Open a session in this terminal
   agent-repl env [python]        Show the Python session's interpreter and environment
+  agent-repl send [runtime]      Run code from stdin in a running session
+  agent-repl input <text>        Answer the READ an LFortran cell from agent-repl waits on
   agent-repl export [runtime]    Write the session's record of submissions to a file
   agent-repl stop [runtime]      Stop a session
 
 Runtimes: python, ipython, julia, r, ghci, clojure (clj), ruby, java, octave,
-matlab, gnuplot, cpp. Sessions are the tmux sessions pi-repl uses
-(pi-repl-python, pi-repl-julia, ...), shared by every agent and terminal.
+matlab, gnuplot, cpp, and lfortran (experimental; needs LFortran's main
+branch). Sessions are the tmux sessions pi-repl uses (pi-repl-python,
+pi-repl-julia, ...), shared by every agent and terminal.
 
 Environment:
   PI_REPL_ECHO_MODE     off, summary (default) or full: how much submitted code
@@ -35,7 +38,7 @@ Environment:
                         name, such as Claude Code or Codex)
   PI_REPL_CONTROL_ROOT  directory for the private files used to submit code`;
 
-const SUBCOMMANDS = new Set(["status", "env", "stop", "attach", "export", "echo", "help"]);
+const SUBCOMMANDS = new Set(["status", "env", "stop", "attach", "export", "echo", "help", "input"]);
 
 interface Captured { message: string; level: Level }
 
@@ -44,7 +47,7 @@ async function runReplCommand(args: string, cwd: string, print: boolean): Promis
 	const notify = (message: string, level: Level) => {
 		captured.push({ message, level });
 		if (!print) return;
-		const text = forAgentRepl(message);
+		const text = forAgentReplOutsideFences(message);
 		if (level === "info") console.log(text);
 		else console.error(text);
 		if (level === "error") process.exitCode = 1;
@@ -68,18 +71,11 @@ async function attach(runtime: string, cwd: string): Promise<void> {
 	const messages = await runReplCommand(`attach ${runtime}`.trim(), cwd, !interactive);
 	const target = attachTarget(messages);
 	if (interactive && target) process.exitCode = attachTerminal(target);
-	else if (interactive) for (const { message, level } of messages) (level === "info" ? console.log : console.error)(forAgentRepl(message));
+	else if (interactive) for (const { message, level } of messages) (level === "info" ? console.log : console.error)(forAgentReplOutsideFences(message));
 }
 
 async function main(argv: string[]): Promise<void> {
-	let cwd = process.cwd();
-	const args: string[] = [];
-	for (let index = 0; index < argv.length; index++) {
-		const arg = argv[index];
-		if (arg === "--cwd") cwd = resolve(argv[++index] ?? ".");
-		else if (arg.startsWith("--cwd=")) cwd = resolve(arg.slice("--cwd=".length));
-		else args.push(arg);
-	}
+	const { cwd, args } = splitArgs(argv, process.cwd());
 	const [first = "", ...rest] = args;
 	const command = first.toLowerCase();
 
@@ -91,6 +87,16 @@ async function main(argv: string[]): Promise<void> {
 		return;
 	}
 	if (command === "attach") { await attach(rest.join(" "), cwd); return; }
+	if (command === "send") {
+		// pi-repl's /repl send takes the code from the lines below the command; here it comes from stdin.
+		if (process.stdin.isTTY) {
+			console.error("Pipe the code in, for example: echo 'print(1)' | agent-repl send python");
+			process.exitCode = 1;
+			return;
+		}
+		await runReplCommand(`send ${rest.join(" ")}\n${readFileSync(0, "utf8")}`, cwd, true);
+		return;
+	}
 	if (SUBCOMMANDS.has(command)) { await runReplCommand(args.join(" "), cwd, true); return; }
 
 	// Anything else is a start request, which pi-repl parses and validates.

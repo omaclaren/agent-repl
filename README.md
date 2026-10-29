@@ -1,6 +1,6 @@
 # agent-repl
 
-Shared REPL sessions for coding agents. agent-repl starts a Python, IPython, Julia, R, Haskell (GHCi), Clojure, Ruby, Java, Octave, MATLAB, gnuplot or C++ REPL in tmux. You attach to it from a terminal and work there as normal. [Claude Code](https://docs.claude.com/en/docs/claude-code), [Codex](https://github.com/openai/codex), [OpenCode](https://opencode.ai) and other agents that support MCP run code in the same session, so you and the agent share one live workspace.
+Shared REPL sessions for coding agents. agent-repl starts a Python, IPython, Julia, R, Haskell (GHCi), Clojure, Ruby, Java, Octave, MATLAB, gnuplot or C++ REPL, or an experimental LFortran session, in tmux. You attach to it from a terminal and work there as normal. [Claude Code](https://docs.claude.com/en/docs/claude-code), [Codex](https://github.com/openai/codex), [OpenCode](https://opencode.ai) and other agents that support MCP run code in the same session, so you and the agent share one live workspace.
 
 agent-repl is [pi-repl](https://github.com/omaclaren/pi-repl) running outside [Pi](https://pi.dev). The tools, runtime support and session handling are pi-repl's own code. agent-repl adds an MCP server and a command-line interface in place of Pi's extension API.
 
@@ -33,7 +33,7 @@ print(f(1000))
 ## Features
 
 - **Shared sessions**: each runtime has one named tmux session (`pi-repl-python`, `pi-repl-julia`, ...), used by you, Pi and every connected agent. An agent sees variables you defined in the terminal, and you see what the agent ran.
-- **MCP tools**: `repl_start`, `repl_status` and `repl_send`, with pi-repl's descriptions and guidance for each runtime.
+- **MCP tools**: `repl_start`, `repl_status`, `repl_send` and `repl_input`, with pi-repl's descriptions and guidance for each runtime.
 - **Command line**: start, attach to, inspect, export and stop sessions from a terminal.
 - **Labelled submissions**: code sent by an agent appears in the pane with its output between labelled markers, as above. How much code is shown can be changed (see [Echo setting](#echo-setting)).
 - **Records**: pi-repl keeps a raw log of each session's pane and a clean record of submitted code and output, which can be exported as Markdown. Each entry in the record names the agent that sent it. A compatible [pi-studio](https://github.com/omaclaren/pi-studio) using the same session shares the clean record.
@@ -42,7 +42,7 @@ print(f(1000))
 
 - Node.js 22 or later
 - [tmux](https://github.com/tmux/tmux)
-- The runtimes you want to use, available as commands in your login shell: `python` or `ipython`, `julia`, `R`, `ghci`, `clojure`, `irb`, `jshell`, `octave-cli`, `matlab`, `gnuplot` or `cling`
+- The runtimes you want to use, available as commands in your login shell: `python` or `ipython`, `julia`, `R`, `ghci`, `clojure`, `irb`, `jshell`, `octave-cli`, `matlab`, `gnuplot`, `cling`, or `lfortran` built from LFortran's `main` branch
 
 agent-repl is an early release, developed and tested on macOS. pi-repl also supports Linux, and Windows through WSL.
 
@@ -98,11 +98,13 @@ New sessions start in the MCP server's working directory, which is wherever the 
 | `agent-repl status [runtime]` | Show running sessions |
 | `agent-repl attach [runtime]` | Attach to a session in this terminal |
 | `agent-repl env [python]` | Show the Python session's interpreter and environment |
+| `agent-repl send [runtime]` | Run code from stdin in a running session, as `repl_send` does, and print the result |
+| `agent-repl input <text>` | Answer the READ that an LFortran cell sent through agent-repl is waiting on |
 | `agent-repl export [runtime]` | Write the session's clean record to a Markdown file in the current directory |
 | `agent-repl stop [runtime]` | Stop a session, verifying that its processes exit |
 | `agent-repl mcp [--cwd <dir>]` | Run the MCP server on stdio |
 
-Runtimes are `python`, `ipython`, `julia`, `r`, `ghci`, `clojure` (or `clj`), `ruby`, `java`, `octave`, `matlab`, `gnuplot` and `cpp`. Python and IPython share one session. Without a runtime, `status` lists every session, and `attach`, `export` and `stop` act on the only running session.
+Runtimes are `python`, `ipython`, `julia`, `r`, `ghci`, `clojure` (or `clj`), `ruby`, `java`, `octave`, `matlab`, `gnuplot`, `cpp` and, experimentally, `lfortran`. Python and IPython share one session. Without a runtime, `status` lists every session, and `attach`, `export` and `stop` act on the only running session.
 
 `attach` runs `tmux attach` in the current terminal, or switches the current client when you are already inside tmux. Without a terminal, for example when an agent runs the command, it prints the `tmux attach` command instead.
 
@@ -115,8 +117,15 @@ These are pi-repl's `/repl` commands, and the output is pi-repl's. The [pi-repl 
 | `repl_start` | Start or reuse a session with an explicit runtime and wait for a normal prompt |
 | `repl_status` | Report which sessions are running, with their paths and recent output |
 | `repl_send` | Run code in a running session and return the submitted code and output, after any pane text the agent hasn't seen |
+| `repl_input` | Answer the READ that an LFortran cell sent by `repl_send` is waiting on |
 
 `repl_send` never starts a session, and stopping one is left to you. The tool descriptions are pi-repl's, with its guidance for agents appended. Claude Code limits an MCP tool description to 2,048 characters, so guidance about choosing a runtime, and the notes for particular runtimes, are attached to the `target` parameter instead. Arguments are checked against pi-repl's parameter schemas, as Pi checks them, before a tool runs.
+
+## LFortran (experimental)
+
+`agent-repl lfortran`, or `repl_start` with `runtime: "lfortran"`, starts LFortran's shared session, `pi-repl-lfortran`. It needs a build of LFortran's `main` branch, found as `lfortran` by your login shell. You work at LFortran's own prompt in the session's first window. The agent's cells go to the same kernel through pi-repl's helper in the second, so you share one set of variables, and your prompt shows the agent's cells when you next press Enter there.
+
+When one of the agent's cells waits on a READ, the agent answers it with `repl_input`, or you can answer it yourself with `agent-repl input <text>`. Unlike the other runtimes, the agent isn't told what you run at your prompt, echo settings don't apply, and there is no clean record or export yet. The [pi-repl README](https://github.com/omaclaren/pi-repl#lfortran-sessions-experimental) describes the session and LFortran's current limits.
 
 ## Echo setting
 
@@ -146,7 +155,7 @@ pi-repl writes submitted code to private temporary files (mode `0600`, in a dire
 
 ## Relationship to pi-repl
 
-`src/pi-repl.ts` is generated from pi-repl's `index.ts` and should not be edited by hand. The only change is where its two Pi imports come from: `src/pi-compat` holds copies of the Pi helpers it uses (output truncation, command execution and `StringEnum`, MIT licensed, © Mario Zechner) and type definitions for the parts of Pi's extension API it calls. `src/shared` is pi-repl's `shared/` directory, unchanged. `src/host.ts` provides that API, and `src/mcp.ts` and `src/cli.ts` expose the tools and the `/repl` command.
+`src/pi-repl.ts` is generated from pi-repl's `index.ts` and should not be edited by hand. The only change is where its Pi imports come from: `src/pi-compat` holds copies of the Pi helpers it uses (output truncation, command execution, `StringEnum` and pi-tui's `stripTerminalSequences`, MIT licensed, © Mario Zechner), type definitions for the parts of Pi's extension API it calls, and stand-ins for pi-tui's `Box` and `Text`. pi-repl draws its Pi messages with those; agent-repl draws none, and the stand-ins let pi-repl's tests of those messages run. `src/shared` is pi-repl's `shared/` directory, unchanged. `src/host.ts` provides that API, and `src/mcp.ts` and `src/cli.ts` expose the tools and the `/repl` command.
 
 With a pi-repl checkout beside this one, after running `npm install` there:
 
@@ -171,7 +180,7 @@ npm run test:upstream  # pi-repl's test suite against the generated copy
 npm run typecheck
 ```
 
-The end-to-end tests start `agent-repl mcp` and the command line against a real Python REPL. They use a separate tmux server with its own socket, a temporary home directory and private temporary files, so they never touch your sessions. They are skipped when tmux or `python3` is not available.
+The end-to-end tests start `agent-repl mcp` and the command line against a real Python REPL. They use a separate tmux server with its own socket, a temporary home directory and private temporary files, so they never touch your sessions. They are skipped when tmux or `python3` is not available. The LFortran test runs only when `PI_REPL_LFORTRAN` names an `lfortran` built from LFortran's `main` branch.
 
 ## License
 

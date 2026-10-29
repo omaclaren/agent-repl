@@ -14,11 +14,11 @@ async function connect(clientInfo = { name: "test", version: "0" }) {
 	return { client, close: () => Promise.all([client.close(), server.close()]) };
 }
 
-test("lists pi-repl's three tools with its descriptions and guidelines", async (t) => {
+test("lists pi-repl's four tools with its descriptions and guidelines", async (t) => {
 	const { client, close } = await connect();
 	t.after(close);
 	const { tools } = await client.listTools();
-	assert.deepEqual(tools.map(tool => tool.name).sort(), ["repl_send", "repl_start", "repl_status"]);
+	assert.deepEqual(tools.map(tool => tool.name).sort(), ["repl_input", "repl_send", "repl_start", "repl_status"]);
 	const instructions = client.getInstructions();
 	// Claude Code caps tool descriptions and server instructions at 2,048 characters.
 	assert.ok(instructions.length <= 2048);
@@ -38,6 +38,7 @@ test("lists pi-repl's three tools with its descriptions and guidelines", async (
 	const send = tools.find(tool => tool.name === "repl_send");
 	assert.match(send.inputSchema.properties.target.description, /target='julia'/);
 	assert.match(send.inputSchema.properties.target.description, /For C\+\+ use target='cpp'/);
+	assert.match(send.inputSchema.properties.target.description, /For LFortran use target='lfortran'[\s\S]*- In LFortran, a runtime error/);
 	assert.deepEqual(send.inputSchema.properties.echoMode.enum, ["off", "summary", "full"]);
 	assert.equal(tools.find(tool => tool.name === "repl_status").annotations.readOnlyHint, true);
 });

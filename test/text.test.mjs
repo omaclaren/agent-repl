@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { forAgentRepl } from "../dist/text.js";
+import { forAgentRepl, forAgentReplOutsideFences } from "../dist/text.js";
 
 test("pi-repl's command wording becomes agent-repl, without the /lab alias", () => {
 	const cases = [
@@ -16,6 +16,9 @@ test("pi-repl's command wording becomes agent-repl, without the /lab alias", () 
 		["Dot commands are terminal-only; use /repl stop cpp to stop.", "Dot commands are terminal-only; use agent-repl stop cpp to stop."],
 		["tmux was not found on PATH. pi-repl requires tmux.", "tmux was not found on PATH. agent-repl requires tmux."],
 		["Respect the current /repl echo setting; use echoMode='off'", "Respect the server's echo setting; use echoMode='off'"],
+		["Stop it with /repl stop lfortran (agent-repl stop lfortran outside Pi).", "Stop it with agent-repl stop lfortran."],
+		["To answer it from here: /repl input <text>", "To answer it from here: agent-repl input <text>"],
+		["Nothing to send. Usage: /repl send [runtime], with the code on the lines below it (Shift+Enter starts a new line).", "Nothing to send. Usage: agent-repl send [runtime], with the code on stdin."],
 	];
 	for (const [input, expected] of cases) assert.equal(forAgentRepl(input), expected);
 });
@@ -30,4 +33,14 @@ test("session names, paths and other text are unchanged", () => {
 		"cd /labs/data && ls /lab/",
 		"sessions (pi-repl-python, pi-repl-julia)",
 	]) assert.equal(forAgentRepl(text), text);
+});
+
+test("a command's fenced result keeps its code and output as they are", () => {
+	const result = "/repl send to pi-repl-python:\n\n```\nprint(\"/lab python\")\n/repl python\n```\nStart one with /repl julia or /lab julia.";
+	assert.equal(forAgentReplOutsideFences(result),
+		"agent-repl send to pi-repl-python:\n\n```\nprint(\"/lab python\")\n/repl python\n```\nStart one with agent-repl julia.");
+	// A longer fence holds shorter ones, and an unclosed fence keeps the rest.
+	assert.equal(forAgentReplOutsideFences("````\n```\n/repl x\n```\n````\n/repl y"), "````\n```\n/repl x\n```\n````\nagent-repl y");
+	assert.equal(forAgentReplOutsideFences("```\n/repl x"), "```\n/repl x");
+	assert.equal(forAgentReplOutsideFences("Use /repl stop python."), "Use agent-repl stop python.");
 });
