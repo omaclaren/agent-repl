@@ -4,6 +4,16 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-10-29
+
+### Changed
+- Generated from pi-repl 0.11.1.
+
+### Added
+- Experimental LFortran sessions, from pi-repl 0.11, which need LFortran's `main` branch. `agent-repl lfortran`, or `repl_start` with `runtime: "lfortran"`, starts `pi-repl-lfortran`: you work at LFortran's own prompt, and the agent's cells go to the same kernel through pi-repl's helper. `repl_send`, `repl_status`, and `agent-repl status`, `attach` and `stop` take `lfortran`.
+- The `repl_input` tool answers a READ that one of the agent's LFortran cells waits on, and `agent-repl input <text>` answers it from a terminal.
+- `agent-repl send [runtime]` runs code from stdin in a running session, as `repl_send` does, and prints the result.
+
 ## [0.3.5] — 2026-10-21
 
 ### Changed
