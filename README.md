@@ -121,6 +121,8 @@ These are pi-repl's `/repl` commands, and the output is pi-repl's. The [pi-repl 
 | `repl_send` | Run code in a running session and return the submitted code and output, after any pane text the agent hasn't seen |
 | `repl_input` | Answer the READ that an LFortran cell sent by `repl_send` is waiting on |
 
+When code outlasts `repl_send`'s wait, the tool returns, but the code goes on: the MCP server keeps the session for it, records its output when it finishes, and the result tells the agent not to send it again. `agent-repl status` shows which send holds a session. When its client disconnects, the server waits for such sends before it exits, saying so on stderr. A client that kills it sooner (the MCP SDK allows about four seconds) leaves that send without an owner; its lease then goes stale after 30 seconds, and a later send may record the code's late output.
+
 `repl_send` never starts a session, and stopping one is left to you. The tool descriptions are pi-repl's, with its guidance for agents appended. Claude Code limits an MCP tool description to 2,048 characters, so guidance about choosing a runtime, and the notes for particular runtimes, are attached to the `target` parameter instead. Arguments are checked against pi-repl's parameter schemas, as Pi checks them, before a tool runs.
 
 ## LFortran (experimental)

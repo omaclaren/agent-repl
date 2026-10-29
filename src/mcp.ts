@@ -17,6 +17,7 @@ import { Compile } from "typebox/compile";
 import { Value } from "typebox/value";
 import { hostContext, loadPiRepl, type Level } from "./host.js";
 import type { ToolDefinition } from "./pi-compat/index.js";
+import { drainSettlingSends, settlingSendCount } from "./pi-repl.js";
 import { forAgentRepl } from "./text.js";
 
 export const INSTRUCTIONS = `agent-repl provides long-lived REPL sessions (Python/IPython, Julia, R, GHCi, Clojure, Ruby, Java, Octave, MATLAB, gnuplot, C++ and, experimentally, LFortran) running in tmux. The user can watch and type into the same session from a terminal, so treat it as shared state: inspect before changing it, and do not assume variables exist.
@@ -106,7 +107,30 @@ export function createMcpServer({ cwd, version, log = message => process.stderr.
 export async function runMcpServer(options: McpOptions): Promise<void> {
 	const server = createMcpServer(options);
 	await server.connect(new StdioServerTransport());
-	const close = () => { void server.close().finally(() => process.exit(0)); };
+	const log = options.log ?? (message => process.stderr.write(`${message}\n`));
+	let closing = false;
+	// A send whose code outlasted its tool call holds its session until the code finishes: exiting
+	// before then would let another send take its late output. So the server waits for its sends,
+	// saying so every minute. A client that kills it first (the MCP SDK's grace is about 4 s) cuts
+	// that short, and the send's lease then goes stale 30 s later.
+	const close = () => {
+		if (closing) {
+			if (settlingSendCount()) log(`agent-repl: still waiting for ${settlingSendCount()} send(s) to finish before exiting.`);
+			return;
+		}
+		closing = true;
+		void (async () => {
+			await server.close().catch(() => undefined);
+			if (settlingSendCount()) {
+				const waiting = () => log(`agent-repl: waiting for ${settlingSendCount()} send(s) still running, so that their output is recorded and no other send takes it.`);
+				waiting();
+				const timer = setInterval(waiting, 60_000);
+				await drainSettlingSends();
+				clearInterval(timer);
+			}
+			process.exit(0);
+		})();
+	};
 	process.stdin.on("end", close);
 	process.on("SIGINT", close);
 	process.on("SIGTERM", close);

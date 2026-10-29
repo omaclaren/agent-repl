@@ -109,6 +109,47 @@ test("CLI: env runs the Python inspection as a settled send", { skip, timeout: 6
 	assert.match(env_.stdout, /^Python\/IPython REPL environment:\nRuntime: python\nSession: pi-repl-python\n\nsys\.executable=/);
 });
 
+test("MCP: a server whose client closes waits for a send still running, so its output is recorded", { skip, timeout: 60000 }, async () => {
+	const drained = new Client({ name: "agent-repl-e2e-drain", title: "E2E Drain", version: "0" });
+	const transport = new StdioClientTransport({ command: process.execPath, args: [cli, "mcp"], cwd: project, env, stderr: "pipe" });
+	let stderr = "";
+	transport.stderr?.on("data", (data) => { stderr += data; });
+	await drained.connect(transport);
+	let sent;
+	let closedAfter;
+	try {
+		sent = await drained.callTool({ name: "repl_send", arguments: { code: "import time\ntime.sleep(1.5)\nprint('DRAINED')", timeoutMs: 1000 } });
+	} finally {
+		// Closing stdin: the server waits for the send rather than exit before its output is recorded.
+		const started = Date.now();
+		await drained.close();
+		closedAfter = Date.now() - started;
+	}
+	assert.equal(sent.isError, true);
+	assert.match(text(sent), /The code may still be running in pi-repl-python\. Don't send it again/);
+	assert.ok(closedAfter < 2000, "it exited by itself, before the SDK's SIGTERM");
+	assert.match(stderr, /^agent-repl: waiting for 1 send\(s\) still running, so that their output is recorded and no other send takes it\.$/m);
+	assert.match(run("status", "python").stdout, /^Latest clean entry: pi-repl · E2E Drain · captured$/m);
+});
+
+test("MCP: a client that disconnects while its tool call still waits leaves the send recorded", { skip, timeout: 60000 }, async () => {
+	const leaving = new Client({ name: "agent-repl-e2e-leave", title: "E2E Leave", version: "0" });
+	const transport = new StdioClientTransport({ command: process.execPath, args: [cli, "mcp"], cwd: project, env, stderr: "pipe" });
+	await leaving.connect(transport);
+	// Still inside its 20 s wait when the client goes: the server must hand it to an owner, not exit.
+	const call = leaving.callTool({ name: "repl_send", arguments: { code: "import time\ntime.sleep(1.5)\nprint('LEFT_BEHIND')", timeoutMs: 20000 } }).catch((error) => error);
+	await new Promise((resolve) => setTimeout(resolve, 500));
+	const started = Date.now();
+	try {
+		await leaving.close();
+		await call;
+	} finally {
+		await transport.close().catch(() => undefined);
+	}
+	assert.ok(Date.now() - started < 2000, "it exited by itself, before the SDK's SIGTERM");
+	assert.match(run("status", "python").stdout, /^Latest clean entry: pi-repl · E2E Leave · captured$/m);
+});
+
 test("CLI: the first Ctrl-C keeps waiting; a second stops waiting, and says that's unsafe", { skip, timeout: 60000 }, async () => {
 	const kept = cliSend(["python", "--notice", "1"], "import time\ntime.sleep(3)\nprint('AFTER_CTRL_C')\n");
 	await kept.until(/^Still running/m);
