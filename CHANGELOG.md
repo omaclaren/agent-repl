@@ -4,6 +4,11 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-10-29
+
+### Fixed
+- `agent-repl send` takes only `lfortran` for now. A send to another runtime waits 20 s, and a cell that ran longer outlasted the command: the session's send lease then lapsed, and the session's next send recorded that cell's late output as its own. LFortran's sends go through its helper, which matches output to cells, so they're unaffected. The other runtimes come back once pi-repl can wait for a cell to settle. Found in review.
+
 ## [0.4.0] — 2026-10-29
 
 ### Changed
