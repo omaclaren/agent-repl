@@ -4,6 +4,14 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+## [0.4.4] — 2026-10-30
+
+### Added
+- `agent-repl name [name|--clear]` shows, sets or clears the name your own sends are recorded under. The name is saved for your account and shared with Pi's `/repl name`; `PI_REPL_USER_NAME` overrides it, and `User` is used when neither is set. `agent-repl send` and `env` record under it, with `cli:send:` and `cli:env:` request IDs, and say so if the saved name can't be used. `agent-repl send lfortran` is still recorded as `/repl send` for now.
+
+### Changed
+- Generated from pi-repl 0.11.5, by way of 0.11.4: late `/repl send` and `/repl env` results in Pi's conversation, and people's names in the record. agent-repl has no conversation, so the late results change nothing here.
+
 ## [0.4.3] — 2026-10-30
 
 ### Changed
