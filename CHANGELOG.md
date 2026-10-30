@@ -4,6 +4,8 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+## [0.4.8] — 2026-10-30
+
 ### Changed
 - `-c`'s code can start on the line after its opening quote, as in `agent-repl send python -c '` with the code on the lines below and the closing `'` on a line of its own. The blank lines before the code are left out of what's sent and recorded. Code from stdin and `-f` is sent as it is.
 
