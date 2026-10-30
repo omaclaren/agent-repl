@@ -130,6 +130,10 @@ test("CLI: send takes the code from -c or -f, and doesn't wait for stdin then", 
 	const inline = await open(["python", "-c", "print('FROM_C', -1)"]);
 	assert.equal(inline.status, 0, inline.stderr);
 	assert.match(inline.stdout, /Submitted code:\nprint\('FROM_C', -1\)\n\nOutput:\nFROM_C -1\n```/);
+	// Code that starts on the line after the opening quote, as typed across lines.
+	const typed = await open(["python", "-c", "\nfor i in range(2):\n    print('TYPED', i)\n"]);
+	assert.equal(typed.status, 0, typed.stderr);
+	assert.match(typed.stdout, /Submitted code:\nfor i in range\(2\):\n    print\('TYPED', i\)\n\nOutput:\nTYPED 0\nTYPED 1\n```/);
 	const file = await open(["python", "-f", "script.py"]);
 	assert.equal(file.status, 0, file.stderr);
 	assert.match(file.stdout, /Output:\nFROM_FILE 42\n```/);

@@ -34,8 +34,9 @@ branch). Sessions are the tmux sessions pi-repl uses (pi-repl-python,
 pi-repl-julia, ...), shared by every agent and terminal.
 
 agent-repl send takes the code as -c <code>, one argument, or from -f <file>
-(relative to --cwd; - for stdin), or else from stdin. -c leaves the code in your
-shell history and in process listings: use -f or stdin for anything sensitive.
+(relative to --cwd; - for stdin), or else from stdin. -c's code can start on the
+line after its opening quote. -c leaves the code in your shell history and in
+process listings: use -f or stdin for anything sensitive.
 It waits however long the code runs, so that its output is recorded and no
 other send takes it. --notice <seconds> (default 20) says when to report that
 it's still running; --lease-wait <seconds> (default 60) is how long to wait for

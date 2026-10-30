@@ -52,13 +52,14 @@ function checkCode(text: string): string {
 }
 
 /**
- * The code `send` was given: `-c`'s argument, the text of `-f`'s file (relative
+ * The code `send` was given: `-c`'s argument without its leading blank lines, the text of `-f`'s file (relative
  * to `cwd`; `-` is stdin), or else stdin. With `-c` or a file, stdin isn't read:
  * an agent's shell gives commands a stdin that isn't a terminal even when
  * nothing is piped in.
  */
 export async function codeFor(args: SendArgs, cwd: string, stdin: AsyncIterable<Buffer | string> & { destroy?: () => void }): Promise<string> {
-	if (args.code !== undefined) return checkCode(args.code);
+	// -c's code may start on the line after its opening quote: the blank lines before the code aren't part of it.
+	if (args.code !== undefined) return checkCode(args.code.replace(/^(?:[ \t]*(?:\r\n|\r|\n))+/, ""));
 	if (args.file === undefined || args.file === "-") return readCode(stdin);
 	try {
 		return await readCode(createReadStream(resolve(cwd, args.file)));

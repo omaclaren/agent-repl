@@ -56,11 +56,16 @@ test("-c's code and -f's file are checked as stdin's code is, and stdin isn't re
 	writeFileSync(join(dir, "big.py"), "x".repeat(MAX_CODE_CHARS + 1));
 	const untouched = { [Symbol.asyncIterator]() { throw new Error("stdin was read"); } };
 	assert.equal(await codeFor({ code: "a\r\nb" }, dir, untouched), "a\nb");
+	// Code that starts on the line after -c's opening quote loses the blank lines before it, and nothing else.
+	assert.equal(await codeFor({ code: "\n \t\r\n\nfor i in x:\n    print(i)\n" }, dir, untouched), "for i in x:\n    print(i)\n");
+	assert.equal(await codeFor({ code: "\n    x = 1\n\ny = 2" }, dir, untouched), "    x = 1\n\ny = 2");
+	assert.equal(await codeFor({ file: "-" }, dir, Readable.from([Buffer.from("\nprint(3)\n")])), "\nprint(3)\n");
 	assert.equal(await codeFor({ file: "script.jl" }, dir, untouched), "x = 1\ny = 2\n");
 	assert.equal(await codeFor({ file: join(dir, "script.jl") }, "/", untouched), "x = 1\ny = 2\n");
 	assert.equal(await codeFor({ file: "-" }, dir, Readable.from([Buffer.from("print(1)\n")])), "print(1)\n");
 	assert.equal(await codeFor({}, dir, Readable.from([Buffer.from("print(2)\n")])), "print(2)\n");
 	await assert.rejects(codeFor({ code: " \n" }, dir, untouched), /^Error: Nothing was sent: the code is empty\.$/);
+	await assert.rejects(codeFor({ code: "\n\n  " }, dir, untouched), /^Error: Nothing was sent: the code is empty\.$/);
 	await assert.rejects(codeFor({ code: "x".repeat(MAX_CODE_CHARS + 1) }, dir, untouched), /longer than 200,000 characters/);
 	await assert.rejects(codeFor({ file: "big.py" }, dir, untouched), /longer than 200,000 characters/);
 	await assert.rejects(codeFor({ file: "missing.py" }, dir, untouched), /^Error: Nothing was sent: missing\.py can't be read \(ENOENT: no such file or directory/);
