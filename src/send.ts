@@ -3,9 +3,8 @@
 // other send can take its late output as its own. Input and Ctrl-C follow the
 // design for people's sends: refuse rather than truncate, and keep waiting at
 // the first Ctrl-C.
-import { randomUUID } from "node:crypto";
 import { hostContext, loadPiRepl, type Level } from "./host.js";
-import { buildReplEnvInspectionCode, formatReplCommandContent, formatReplEnvResult, formatReplSendResult, sendAndSettle } from "./pi-repl.js";
+import { buildReplEnvInspectionCode, formatReplCommandContent, formatReplEnvResult, formatReplSendResult, personRequestId, resolvePersonName, sendAndSettle } from "./pi-repl.js";
 
 /** The longest code pi-repl's record keeps whole, after newline normalisation. */
 export const MAX_CODE_CHARS = 200_000;
@@ -110,9 +109,16 @@ async function settle(cwd: string, options: { runtime?: string; code: string; re
 	}
 }
 
+/** The person's name for a send's record entry; a problem with the setting is said, and the send goes on. */
+function personSending(): string {
+	const person = resolvePersonName();
+	if (person.warning) console.error(`${person.warning} This send is recorded as ${JSON.stringify(person.name)}.`);
+	return person.name;
+}
+
 /** `agent-repl send [runtime]` for the pane runtimes: the result as /repl send gives it, its code and output in a fence. */
 export async function sendFromStdin(cwd: string, args: SendArgs, code: string, notify: (message: string, level: Level) => void): Promise<SettledResult> {
-	const execution = await settle(cwd, { ...args, code, requestId: `command:send:${randomUUID()}`, label: "/repl send" }, notify);
+	const execution = await settle(cwd, { ...args, code, requestId: personRequestId("cli", "send"), label: personSending() }, notify);
 	return {
 		text: formatReplCommandContent(`/repl send to ${execution.details.sessionName}`, formatReplSendResult(execution.output, execution.details).text),
 		// It ran, but the record couldn't be updated: a status of its own.
@@ -122,7 +128,7 @@ export async function sendFromStdin(cwd: string, args: SendArgs, code: string, n
 
 /** `agent-repl env`: /repl env's inspection, settled as a send is. */
 export async function envSettled(cwd: string, notify: (message: string, level: Level) => void): Promise<SettledResult> {
-	const execution = await settle(cwd, { code: buildReplEnvInspectionCode(), requestId: `command:env:${Date.now().toString(36)}`, label: "/repl env" }, notify);
+	const execution = await settle(cwd, { code: buildReplEnvInspectionCode(), requestId: personRequestId("cli", "env"), label: personSending() }, notify);
 	const warning = execution.details.recordWarning ? `\n\nShared record warning: ${execution.details.recordWarning}` : "";
 	return { text: `${formatReplEnvResult(execution)}${warning}`, exitCode: execution.details.recordWarning ? 2 : 0 };
 }

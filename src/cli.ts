@@ -24,6 +24,7 @@ Usage:
   agent-repl env [python]        Show the Python session's interpreter and environment
   agent-repl send [runtime]      Run code from stdin in a running session, and wait until it's done
   agent-repl input <text>        Answer the READ an LFortran cell from agent-repl waits on
+  agent-repl name [name|--clear] Show, set or clear the name your sends are recorded under
   agent-repl export [runtime]    Write the session's record of submissions to a file
   agent-repl stop [runtime]      Stop a session
 
@@ -41,11 +42,12 @@ the first press keeps waiting, and a second stops waiting, which is unsafe.
 Environment:
   PI_REPL_ECHO_MODE     off, summary (default) or full: how much submitted code
                         the MCP server echoes into the REPL pane
-  PI_REPL_AGENT_LABEL   name recorded for submissions (default: the agent's own
-                        name, such as Claude Code or Codex)
+  PI_REPL_AGENT_LABEL   name recorded for an agent's submissions (default: the
+                        agent's own name, such as Claude Code or Codex)
+  PI_REPL_USER_NAME     name recorded for your own sends, over agent-repl name's
   PI_REPL_CONTROL_ROOT  directory for the private files used to submit code`;
 
-const SUBCOMMANDS = new Set(["status", "env", "stop", "attach", "export", "echo", "help", "input"]);
+const SUBCOMMANDS = new Set(["status", "env", "stop", "attach", "export", "echo", "help", "input", "name"]);
 
 /** Prints a settled send's result, or why it wasn't sent; Ctrl-C before sending exits 130. */
 async function printSettled(run: () => Promise<SettledResult>): Promise<void> {

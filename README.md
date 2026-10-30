@@ -100,6 +100,7 @@ New sessions start in the MCP server's working directory, which is wherever the 
 | `agent-repl env [python]` | Show the Python session's interpreter and environment |
 | `agent-repl send [runtime]` | Run your own code from stdin in a running session, wait until it's done, and print the result |
 | `agent-repl input <text>` | Answer the READ that an LFortran cell sent through agent-repl is waiting on |
+| `agent-repl name [name\|--clear]` | Show, set or clear the name your own sends are recorded under |
 | `agent-repl export [runtime]` | Write the session's clean record to a Markdown file in the current directory |
 | `agent-repl stop [runtime]` | Stop a session, verifying that its processes exit |
 | `agent-repl mcp [--cwd <dir>]` | Run the MCP server on stdio |
@@ -142,6 +143,8 @@ claude mcp add --scope user -e PI_REPL_ECHO_MODE=off agent-repl -- agent-repl mc
 An agent can also pass `echoMode` for a single `repl_send`. Full mode keeps longer source code in the pane's history.
 
 ## Agent names in the record
+
+Your own sends, from `agent-repl send` and `env`, are recorded under your name: the one `agent-repl name` saves for your account, which `PI_REPL_USER_NAME` overrides, or `User` when neither is set. Pi's `/repl name` sets the same saved name.
 
 Entries in the clean record, and in `agent-repl export`, are labelled with the name the agent gives when it connects: `Claude Code` and `Codex` name themselves, and other agents are labelled with whatever name they send. To choose the label yourself, set `PI_REPL_AGENT_LABEL` in the server's environment, as for the echo setting. OpenCode 2 identifies itself only as `cli`, so the OpenCode configuration above sets the label. Submissions from Pi are labelled `Pi`.
 

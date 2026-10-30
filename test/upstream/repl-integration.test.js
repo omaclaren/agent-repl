@@ -13,12 +13,15 @@ import { createTestTmux, readProcessTable } from "./helpers/repl-test-tmux.js";
 import { visibleWidth } from "@earendil-works/pi-tui";
 
 const exec = promisify(execFile);
-const originalEnv = { TMPDIR: process.env.TMPDIR, PI_REPL_CONTROL_ROOT: process.env.PI_REPL_CONTROL_ROOT, SHELL: process.env.SHELL, PI_REPL_ECHO_MODE: process.env.PI_REPL_ECHO_MODE };
+const originalEnv = { TMPDIR: process.env.TMPDIR, PI_REPL_CONTROL_ROOT: process.env.PI_REPL_CONTROL_ROOT, SHELL: process.env.SHELL, PI_REPL_ECHO_MODE: process.env.PI_REPL_ECHO_MODE, XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME, PI_REPL_USER_NAME: process.env.PI_REPL_USER_NAME };
 const root = mkdtempSync(join(tmpdir(), "pi-repl-integration-"));
 process.env.TMPDIR = root;
 process.env.PI_REPL_CONTROL_ROOT = join(root, "controls");
 process.env.SHELL = "/bin/sh";
 delete process.env.PI_REPL_ECHO_MODE;
+// The person setting is this run's own, never the account's.
+process.env.XDG_CONFIG_HOME = join(root, "config");
+delete process.env.PI_REPL_USER_NAME;
 const available = process.platform !== "win32" && spawnSync("tmux", ["-V"]).status === 0;
 const optionalRuntimes = new Set((process.env.PI_REPL_TEST_RUNTIMES || "").split(","));
 
@@ -841,7 +844,8 @@ test("/repl send runs the person's code below it and posts the result to the con
 	assert.equal(message.content, `/repl send to pi-repl-python:\n\n\`\`\`\n${PANE_HEADING}\n[pane text]\n>>> pi_typed = 5\n[end of pane text]\n\nSubmitted code:\nfor i in range(3):\n    print(i)\nprint('fin')\n\nOutput:\n0\n1\n2\nfin\n\`\`\``);
 	assert.equal(paneReport(await f.send("print(pi_typed)")), undefined, "the agent has been told");
 	const entry = readReplSessionRecord((await f.status()).details.python.recordId).entries.find((e) => e.code.includes("print('fin')"));
-	assert.equal(entry.label, "/repl send");
+	assert.equal(entry.label, "User");
+	assert.match(entry.requestId, /^pi:send:[0-9a-f-]{36}$/);
 	assert.equal(entry.mode, "raw");
 	assert.equal(entry.output, "0\n1\n2\nfin");
 	// The person sees the code and its output, as wide as the terminal at most, without the agent's text.
@@ -870,6 +874,61 @@ test("/repl send runs the person's code below it and posts the result to the con
 	await f.repl("send\nprint(pi_typed)");
 	assert.match(f.notifications.at(-1).message, /^\/repl send to pi-repl-python:[\s\S]*Output:\n6\n```$/);
 	assert.match(paneReport(await f.send("print(0)")), /\n>>> pi_typed = 6\n[\s\S]*\n6\n/);
+});
+
+test("a person's /repl send and /repl env are recorded under their name, via Pi; agent sends keep theirs", { timeout: 60000 }, async (t) => {
+	const f = await fixture(t, { startWithTool: true });
+	if (!f) return;
+	const setting = join(process.env.XDG_CONFIG_HOME, "pi-repl", "person.json");
+	t.after(() => {
+		rmSync(setting, { force: true });
+		delete process.env.PI_REPL_USER_NAME;
+	});
+	const recordId = (await f.status()).details.python.recordId;
+	const latest = () => readReplSessionRecord(recordId).entries.at(-1);
+	const said = () => f.notifications.at(-1);
+
+	await f.repl("name");
+	assert.deepEqual(said(), { level: "info", message: `Your sends are recorded as "User": no name is set.\nSet one with /repl name <name>. It's saved in ${setting}, for everyone on this account without PI_REPL_USER_NAME.` });
+	assert.equal(existsSync(setting), false, "showing the name writes nothing");
+	await f.repl("name   Sam Smith ");
+	assert.deepEqual(said(), { level: "info", message: `Saved "Sam Smith" in ${setting}, for everyone on this account without PI_REPL_USER_NAME. Earlier entries keep the name they were recorded with.` });
+	assert.equal(statSync(setting).mode & 0o777, 0o600);
+
+	await f.repl("send\nprint('NAMED')");
+	assert.deepEqual([latest().label, latest().mode, latest().origin], ["Sam Smith", "raw", "pi-repl"]);
+	assert.match(latest().requestId, /^pi:send:[0-9a-f-]{36}$/);
+	await f.repl("env");
+	assert.deepEqual([latest().label, latest().mode], ["Sam Smith", "raw"]);
+	assert.match(latest().requestId, /^pi:env:[0-9a-f-]{36}$/);
+	// An agent's send keeps the agent's label and route.
+	await f.send("print('AGENT')");
+	assert.deepEqual([latest().label, latest().mode], ["Pi", "agent"]);
+	assert.match(latest().requestId, /^tool:/);
+
+	// PI_REPL_USER_NAME overrides the saved name, which `name` still reports.
+	process.env.PI_REPL_USER_NAME = "Alex";
+	await f.repl("send\nprint('OVERRIDDEN')");
+	assert.equal(latest().label, "Alex");
+	await f.repl("name");
+	assert.equal(said().message, `Your sends are recorded as "Alex", from PI_REPL_USER_NAME.\nThe saved name, "Sam Smith" (${setting}), applies where PI_REPL_USER_NAME isn't set.`);
+	await f.repl("name Robin");
+	assert.match(said().message, /\nHere, PI_REPL_USER_NAME \("Alex"\) still takes precedence\.$/);
+	delete process.env.PI_REPL_USER_NAME;
+
+	// An invalid name is refused; a setting that can't be used is warned about, and the send is recorded as User.
+	await f.repl("name \u0007");
+	assert.deepEqual(said(), { level: "error", message: "Not saved: the name has control characters." });
+	writeFileSync(setting, "{");
+	await f.repl("send\nprint('MALFORMED')");
+	assert.equal(latest().label, "User");
+	const warning = f.notifications.filter((n) => n.level === "warning").at(-1);
+	assert.equal(warning.message, `${setting} isn't valid JSON, so it was ignored. This send is recorded as "User".`);
+	assert.equal(readFileSync(setting, "utf8"), "{", "a send never rewrites the setting");
+
+	await f.repl("name --clear");
+	assert.match(said().message, new RegExp(`^Removed the saved name from ${setting.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.\\nYour sends are recorded as "User": no name is set\\.`));
+	assert.equal(existsSync(setting), false);
 });
 
 test("pane text reaches the agent at the start of a prompt, once, for panes it has used", { timeout: 60000 }, async (t) => {
@@ -2394,4 +2453,193 @@ test("a tool send told only what is known: finished as its wait ran out, or ende
 	const ended = readReplSessionRecord(recordId).entries.at(-1);
 	assert.equal(ended.status, "error");
 	assert.equal(ended.output, "the runtime ended before completion could be confirmed");
+});
+
+// Makes the next command's code outlast its wait without waiting for it: once the code is entered,
+// the wait's first look at the pane moves the clock past the wait. settle() waits for the code's
+// owner, then puts the clock back.
+function outlastingWaits(t, f, ms = 20_000) {
+	const realNow = Date.now;
+	let offset = 0;
+	let armed = false;
+	let entered = false;
+	t.mock.method(Date, "now", () => realNow() + offset);
+	f.onEnter(() => { entered = armed; });
+	f.onExec((command, args) => {
+		if (entered && command === "tmux" && args[0] === "capture-pane") {
+			armed = entered = false;
+			offset = ms;
+		}
+	});
+	return {
+		next: () => { armed = true; },
+		settle: async () => {
+			await f.module.drainSettlingSends();
+			offset = 0;
+		},
+	};
+}
+
+test("/repl send that outlasts its wait posts its result when the code finishes, without repeating what a prompt reported", { timeout: 60000 }, async (t) => {
+	const f = await fixture(t, { startWithTool: true });
+	if (!f) return;
+	const recordId = (await f.status()).details.python.recordId;
+	const waits = outlastingWaits(t, f);
+	assert.equal(paneReport(await f.send("pi_seen = 1")), undefined);
+	await typeAtPrompt(f, "pi_typed = 7");
+	await paneSettles(f, /pi_typed = 7\n>>>$/m);
+	waits.next();
+	await f.repl("send\nimport time\ntime.sleep(1)\nprint('LATE_ONLY')");
+	// The person is told it goes on and its result will be posted; the agent isn't told anything yet.
+	assert.equal(f.messages.length, 0);
+	const notice = f.notifications.at(-1);
+	assert.equal(notice.level, "warning");
+	assert.match(notice.message, /^Timed out waiting for REPL output after 20000ms\./);
+	assert.match(notice.message, /\n\nThe code may still be running in pi-repl-python\. Don't send it again: pi-repl keeps the session for it until it finishes or its runtime ends, then records its output \(record \S+, entry pi-repl:pi:send:[^)]+\); other sends wait until then\. Its result will be posted here when it's done\.$/);
+	await waits.settle();
+	// When it finishes, its result is posted as the command's would have been, with the pane text the agent hadn't seen.
+	assert.equal(f.messages.length, 1);
+	const [{ message, options }] = f.messages;
+	assert.equal(message.customType, "pi-repl-send");
+	assert.deepEqual(options, { triggerTurn: false });
+	assert.equal(message.content, `/repl send to pi-repl-python, after the command stopped waiting:\n\n\`\`\`\n${PANE_HEADING}\n[pane text]\n>>> pi_typed = 7\n[end of pane text]\n\nSubmitted code:\nimport time\ntime.sleep(1)\nprint('LATE_ONLY')\n\nOutput:\nLATE_ONLY\n\`\`\``);
+	assert.deepEqual(renderPosted(f, message, 80).map((line) => line.trim()).filter(Boolean), ["/repl send · pi-repl-python  done, after the wait", "import time", "time.sleep(1)", "print('LATE_ONLY')", "LATE_ONLY"]);
+	assert.equal(readReplSessionRecord(recordId).entries.at(-1).output, "LATE_ONLY");
+	assert.equal(paneReport(await f.send("print(pi_typed)")), undefined, "the agent has been told");
+
+	// A prompt while the code runs reports its first output, so the late result tells only what followed.
+	waits.next();
+	await f.repl("send\nimport time\nprint('LATE_FIRST', flush=True)\ntime.sleep(3)\nprint('LATE_SECOND')");
+	await paneSettles(f, /^LATE_FIRST$/m);
+	const reported = (await f.fire("before_agent_start", { prompt: "next" })).find(Boolean)?.message;
+	assert.match(reported.content, /\nLATE_FIRST\n/);
+	await f.fire("agent_start");
+	await waits.settle();
+	const late = f.messages.at(-1).message;
+	const told = late.content.split("\n\nOutput:\n")[1];
+	assert.match(told, /^\[Pane text reported at the start of a prompt while it ran showed part of this send, so here is the pane text since\.\]\nPane text since this agent last saw this pane, up to the end of this submission \(best effort;/);
+	assert.match(told, /\nLATE_SECOND\n/);
+	assert.doesNotMatch(told, /LATE_FIRST/);
+	// The person sees all of it.
+	const shown = renderPosted(f, late, 80).map((line) => line.trim());
+	assert.ok(shown.includes("LATE_FIRST") && shown.includes("LATE_SECOND"), shown.join("\n"));
+	assert.equal(paneReport(await f.send("print(2)")), undefined, "the agent has been told");
+
+	// If its runtime ends first, all that's posted is that the outcome is unknown.
+	waits.next();
+	await f.repl("send\nimport os, time\ntime.sleep(1)\nos._exit(0)");
+	await waits.settle();
+	const ended = f.messages.at(-1).message;
+	assert.equal(ended.content, "/repl send to pi-repl-python, after the command stopped waiting:\n\n```\nSubmitted code:\nimport os, time\ntime.sleep(1)\nos._exit(0)\n\nThe code was sent and may have run, but the runtime ended before completion could be confirmed, so its outcome is unknown. Nothing was retried.\n```");
+	assert.equal(renderPosted(f, ended, 80)[1].trim(), "/repl send · pi-repl-python  outcome unknown");
+});
+
+test("a late /repl send result waits for a prompt start's run, and a result that can't be shown is reported", { timeout: 60000 }, async (t) => {
+	const f = await fixture(t, { startWithTool: true });
+	if (!f) return;
+	const recordId = (await f.status()).details.python.recordId;
+	const waits = outlastingWaits(t, f);
+	assert.equal(paneReport(await f.send("pi_seen = 1")), undefined);
+	// The code finishes after a prompt's pane text is prepared, before its run starts.
+	waits.next();
+	await f.repl("send\nimport time\nprint('RACE_FIRST', flush=True)\ntime.sleep(1.5)\nprint('RACE_LAST')");
+	await paneSettles(f, /^RACE_FIRST$/m);
+	const reported = (await f.fire("before_agent_start", { prompt: "next" })).find(Boolean)?.message;
+	assert.match(reported.content, /\nRACE_FIRST\n/);
+	assert.doesNotMatch(reported.content, /^RACE_LAST$/m);
+	await waits.settle();
+	// The result waits for the run to start with that text, then tells only what followed it.
+	assert.equal(f.messages.length, 0);
+	await f.fire("agent_start");
+	await eventually(() => f.messages.length === 1);
+	const told = f.messages[0].message.content.split("\n\nOutput:\n")[1];
+	assert.match(told, /\nRACE_LAST\n/);
+	assert.doesNotMatch(told, /RACE_FIRST/);
+	// The run's start doesn't put back the view the result advanced, so the agent isn't told it again.
+	assert.equal(paneReport(await f.send("print(3)")), undefined);
+
+	// Another send that finishes while the result waits reports the pane first, bounded, so here
+	// without this output; the result keeps that send's newer view, and still tells the output.
+	waits.next();
+	await f.repl("send\nimport time\ntime.sleep(1)\nprint('A_LATE')");
+	assert.ok((await f.fire("before_agent_start", { prompt: "next" })).find(Boolean)?.message);
+	await waits.settle();
+	await typeAtPrompt(f, "print('\\n'.join('NOISE %d' % i for i in range(80)))");
+	await paneSettles(f, /^NOISE 79$/m);
+	await f.repl("send\nprint('B_ON_TIME')");
+	assert.equal(f.messages.length, 2);
+	assert.match(f.messages[1].message.content, /\nNOISE 79\n[\s\S]*\nOutput:\nB_ON_TIME\n```$/);
+	assert.doesNotMatch(f.messages[1].message.content, /^A_LATE$/m);
+	await f.fire("agent_start");
+	await eventually(() => f.messages.length === 3);
+	assert.equal(f.messages[2].message.content.split("\n\nOutput:\n")[1], "[Pane text reported after it finished may already have shown some or all of this.]\nA_LATE\n```");
+	assert.equal(paneReport(await f.send("print(4)")), undefined);
+
+	// A prompt start dropped by a reset doesn't hold the result up.
+	waits.next();
+	await f.repl("send\nimport time\ntime.sleep(1)\nprint('AFTER_RESET')");
+	assert.ok((await f.fire("before_agent_start", { prompt: "next" })).find(Boolean)?.message);
+	await waits.settle();
+	assert.equal(f.messages.length, 3);
+	await f.fire("session_compact");
+	await eventually(() => f.messages.length === 4);
+	assert.match(f.messages[3].message.content, /\nOutput:\nAFTER_RESET\n```$/);
+
+	// If its result can't be shown, the person is told so, and nothing is left unhandled.
+	const { default: fs } = await import("node:fs");
+	const { syncBuiltinESMExports } = await import("node:module");
+	const mkdtemp = fs.mkdtempSync;
+	const failing = t.mock.method(fs, "mkdtempSync", (prefix, ...rest) => {
+		if (String(prefix).includes("pi-repl-output-")) throw new Error("ENOSPC: no space left on device, mkdtemp");
+		return mkdtemp(prefix, ...rest);
+	});
+	syncBuiltinESMExports();
+	waits.next();
+	await f.repl("send\nimport time\ntime.sleep(1)\nprint('\\n'.join(str(i) for i in range(2500)))");
+	await waits.settle();
+	failing.mock.restore();
+	syncBuiltinESMExports();
+	assert.equal(f.messages.length, 4);
+	assert.deepEqual(f.notifications.at(-1), { level: "warning", message: "/repl send to pi-repl-python: its late result couldn't be shown (ENOSPC: no space left on device, mkdtemp)." });
+	assert.equal(readReplSessionRecord(recordId).entries.at(-1).status, "captured");
+});
+
+test("/repl env that outlasts its wait shows its result later; a late /repl send result isn't posted into a replaced conversation, or where there are no messages", { timeout: 60000 }, async (t) => {
+	const f = await fixture(t, { startWithTool: true });
+	if (!f) return;
+	const recordId = (await f.status()).details.python.recordId;
+	const waits = outlastingWaits(t, f);
+	// Python is busy with code typed at its prompt, so the env code waits behind it.
+	await typeAtPrompt(f, "import time; time.sleep(1.5)");
+	waits.next();
+	await f.repl("env");
+	assert.equal(f.notifications.at(-1).level, "warning");
+	assert.match(f.notifications.at(-1).message, /\n\nThe code may still be running in pi-repl-python\. [^\n]* Its result will be shown here when it's done\.$/);
+	await waits.settle();
+	assert.equal(f.notifications.at(-1).level, "info");
+	// (The output keeps the prompt Python showed when the typed code finished.)
+	assert.match(f.notifications.at(-1).message, /^Python\/IPython REPL environment:\nRuntime: python\nSession: pi-repl-python\n\n(>>> \n)?sys\.executable=/);
+	assert.equal(f.messages.length, 0);
+
+	// Its conversation was replaced, so Pi's API is stale: nothing is posted, and the agent hasn't been told.
+	const sendMessage = f.pi.sendMessage;
+	f.pi.sendMessage = () => { throw new Error("This extension ctx is stale after session replacement or reload."); };
+	waits.next();
+	await f.repl("send\nimport time\ntime.sleep(1)\nprint('LATE_STALE')");
+	await waits.settle();
+	f.pi.sendMessage = sendMessage;
+	assert.equal(f.messages.length, 0);
+	assert.equal(readReplSessionRecord(recordId).entries.at(-1).output, "LATE_STALE");
+	assert.match(paneReport(await f.send("print(1)")), /\nLATE_STALE\n/);
+
+	// Without messages, the notice is as before, and nothing follows it.
+	f.withoutMessages();
+	waits.next();
+	await f.repl("send\nimport time\ntime.sleep(1)\nprint('LATE_UNPOSTED')");
+	const notices = f.notifications.length;
+	assert.equal(f.notifications.at(-1).level, "error");
+	assert.match(f.notifications.at(-1).message, /other sends wait until then\.$/);
+	await waits.settle();
+	assert.equal(f.notifications.length, notices);
+	assert.equal(readReplSessionRecord(recordId).entries.at(-1).output, "LATE_UNPOSTED");
 });

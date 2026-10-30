@@ -36,7 +36,8 @@ before(async () => {
 	socketRoot = mkdtempSync("/tmp/ar-");
 	env = { ...process.env, HOME: home, SHELL: "/bin/sh", PATH: `${bin}:${process.env.PATH}`, TMPDIR: root,
 		TMUX_TMPDIR: socketRoot, PI_REPL_CONTROL_ROOT: join(root, "controls") };
-	for (const key of ["TMUX", "TMUX_PANE", "PI_REPL_ECHO_MODE", "PYTHONSTARTUP"]) delete env[key];
+	// XDG_CONFIG_HOME would put a test's saved name in yours.
+	for (const key of ["TMUX", "TMUX_PANE", "PI_REPL_ECHO_MODE", "PYTHONSTARTUP", "XDG_CONFIG_HOME", "PI_REPL_USER_NAME"]) delete env[key];
 	client = new Client({ name: "agent-repl-e2e", title: "E2E Agent", version: "0" });
 	await client.connect(new StdioClientTransport({ command: process.execPath, args: [cli, "mcp"], cwd: project, env, stderr: "pipe" }));
 });
@@ -101,6 +102,18 @@ test("CLI: send waits past its notice until the code is done, and another send w
 	assert.match(result.stdout, /^agent-repl send to pi-repl-python:\n\n```\n[\s\S]*Output:\nCLI_LATE\n```\n?$/);
 	assert.match(text(other), /Output:\nMCP_ONLY$/);
 	assert.doesNotMatch(text(other).split("Output:")[1], /CLI_LATE/);
+});
+
+test("CLI: name sets the name your sends are recorded under, and send records under it", { skip, timeout: 60000 }, async () => {
+	assert.match(run("name").stdout, /^Your sends are recorded as "User": no name is set\.\nSet one with agent-repl name <name>\./);
+	const saved = run("name", "Ada", "Lovelace");
+	assert.equal(saved.status, 0, saved.stderr);
+	assert.match(saved.stdout, /"Ada Lovelace"/);
+	const send = cliSend(["python"], "print('BY_ADA')\n");
+	assert.equal((await send.exited).code, 0);
+	assert.match(run("status", "python").stdout, /^Latest clean entry: pi-repl · Ada Lovelace · captured$/m);
+	const cleared = run("name", "--clear");
+	assert.match(cleared.stdout, /^Removed the saved name from .*person\.json\.\nYour sends are recorded as "User"/);
 });
 
 test("CLI: env runs the Python inspection as a settled send", { skip, timeout: 60000 }, () => {
