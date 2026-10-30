@@ -16,8 +16,8 @@ import { fileURLToPath } from "node:url";
 import { HELPER_FILES, HELPER_PROTOCOL_VERSION, HelperClient, RECORD_FILE, checkPrivateDirectory } from "./repl-jupyter-helper.js";
 import { readOwnerMarkers } from "./repl-gnuplot-processes.js";
 import {
-	REPL_SESSION_RECORD_ID_OPTION, REPL_SESSION_RECORD_VERSION, REPL_SESSION_RECORD_VERSION_OPTION,
-	createReplSessionRecordId, ensureReplSessionRecord, getReplSessionRecordRoot,
+	REPL_SESSION_RECORD_ID_OPTION, REPL_SESSION_RECORD_ROOT_KEY_OPTION, REPL_SESSION_RECORD_VERSION, REPL_SESSION_RECORD_VERSION_OPTION,
+	bindReplSessionRecordRoot, createReplSessionRecordId, ensureReplSessionRecord, getReplSessionRecordRoot, replSessionRecordRootKeyTmux,
 } from "./repl-session-record.js";
 import { SessionStopProcesses, endVerifiedSurvivors, fingerprint, fingerprintFormat, live, processKey, readPanes, readStopProcessTable } from "./repl-session-stop.js";
 
@@ -220,9 +220,10 @@ async function setOption(tmux, target, name, value, scope = []) {
 
 /**
  * The session's shared clean record, as the other runtimes' sessions have
- * one: its ID in the session's tmux options, and DIR/record.json, which tells
- * this launch's helper (`owner`) where to write its entries. record.json is
- * written last, so that the helper records only once everything else is in
+ * one: its record-directory key, bound first, before the record or its ID
+ * exists; its ID in the session's tmux options; and DIR/record.json, which
+ * tells this launch's helper (`owner`) where to write its entries. record.json
+ * is written last, so that the helper records only once everything else is in
  * place. Resolves with a warning, rather than failing the start, when it
  * can't be set up; cells are then not recorded.
  */
@@ -235,8 +236,12 @@ async function setUpRecord(tmux, { sessionId, sessionName, dir, owner, recordRoo
 		const identity = { sessionName, tmuxSessionId: sessionId, tmuxSessionCreatedAt, runtime: "lfortran" };
 		const recordId = createReplSessionRecordId();
 		const root = getReplSessionRecordRoot(recordRoot ? { root: recordRoot } : {});
-		ensureReplSessionRecord(recordId, identity, { root });
+		// The record-directory key comes first, as for any writer making fresh metadata.
+		const bound = await bindReplSessionRecordRoot(replSessionRecordRootKeyTmux(tmux, identity), { sessionName, identity }, { root });
+		if (!bound.ok) throw new Error(bound.reason);
+		// From here, the key this setup bound is removed with the other options if it fails.
 		options = true;
+		ensureReplSessionRecord(recordId, identity, { root });
 		if (!(await setOption(tmux, sessionId, REPL_SESSION_RECORD_ID_OPTION, recordId)) || !(await setOption(tmux, sessionId, REPL_SESSION_RECORD_VERSION_OPTION, String(REPL_SESSION_RECORD_VERSION)))) {
 			throw new Error("its tmux options couldn't be set");
 		}
@@ -245,7 +250,7 @@ async function setUpRecord(tmux, { sessionId, sessionName, dir, owner, recordRoo
 		return null;
 	} catch (error) {
 		// Nothing names a record that won't be written to.
-		if (options) for (const name of [REPL_SESSION_RECORD_ID_OPTION, REPL_SESSION_RECORD_VERSION_OPTION]) await tmux(["set-option", "-qu", "-t", sessionId, name]).catch(() => {});
+		if (options) for (const name of [REPL_SESSION_RECORD_ID_OPTION, REPL_SESSION_RECORD_VERSION_OPTION, REPL_SESSION_RECORD_ROOT_KEY_OPTION]) await tmux(["set-option", "-qu", "-t", sessionId, name]).catch(() => {});
 		return `The session's shared record couldn't be set up (${error.message}), so its cells won't be recorded.`;
 	}
 }

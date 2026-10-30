@@ -4,6 +4,12 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+## [0.4.6] — 2026-10-30
+
+### Changed
+- Generated from pi-repl 0.11.7. Each session records which directory holds its clean record, so an `agent-repl send` from a terminal whose record directory is a different one, such as one with another `TMPDIR`, is refused before anything is sent, rather than kept in a second record. `agent-repl status` and `export` only read, and status says when a session's record directory isn't verified yet or is a different one.
+- `repl_send`'s guidance asks agents to save a plot you want to see to an image file and print its path, unless you want a window.
+
 ## [0.4.5] — 2026-10-30
 
 ### Added
