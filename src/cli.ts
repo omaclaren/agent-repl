@@ -9,7 +9,7 @@ import { splitArgs } from "./args.js";
 import { attachArgs } from "./attach.js";
 import { hostContext, loadPiRepl, type Level } from "./host.js";
 import { runMcpServer } from "./mcp.js";
-import { CancelledSend, envSettled, parseSendArgs, readCode, SendRefused, sendFromStdin, type SettledResult } from "./send.js";
+import { CancelledSend, envSettled, parseSendArgs, readCode, SendRefused, sendFromStdin, sendLfortranFromStdin, type SettledResult } from "./send.js";
 import { forAgentReplOutsideFences } from "./text.js";
 
 const VERSION = (JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string }).version;
@@ -117,14 +117,10 @@ async function main(argv: string[]): Promise<void> {
 			process.exitCode = 1;
 			return;
 		}
-		// LFortran's helper matches output to cells and goes on recording a cell after its sender stops waiting.
-		if (rest[0]?.toLowerCase() === "lfortran") {
-			await runReplCommand(`send ${rest.join(" ")}\n${readFileSync(0, "utf8")}`, cwd, true);
-			return;
-		}
 		await printSettled(async () => {
 			const sendArgs = parseSendArgs(rest);
-			return sendFromStdin(cwd, sendArgs, await readCode(process.stdin), notifyStderr);
+			const send = sendArgs.runtime?.toLowerCase() === "lfortran" ? sendLfortranFromStdin : sendFromStdin;
+			return send(cwd, sendArgs, await readCode(process.stdin), notifyStderr);
 		});
 		return;
 	}

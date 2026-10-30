@@ -258,13 +258,29 @@ test("MCP and CLI: LFortran's shared session, with READs answered by repl_input 
 		const option = run("input", "--cwd=/tmp");
 		assert.equal(option.status, 0, option.stderr);
 		assert.match(option.stdout, /--cwd=\/tmp \/lab python/);
-		const piped = spawnSync(process.execPath, [cli, "send", "lfortran"], { cwd: project, env, encoding: "utf8", timeout: 30000, input: "print *, n\n" });
+		const named = { ...env, PI_REPL_USER_NAME: "Ada" };
+		const piped = spawnSync(process.execPath, [cli, "send", "lfortran"], { cwd: project, env: named, encoding: "utf8", timeout: 30000, input: "print *, n\n" });
 		assert.equal(piped.status, 0, piped.stderr);
 		assert.match(piped.stdout, /Output:\n\s*41/);
 		// A READ in the person's own cell: the hint after the result names agent-repl's command.
-		const asks = spawnSync(process.execPath, [cli, "send", "lfortran"], { cwd: project, env, encoding: "utf8", timeout: 30000, input: "read(*, *) k\nprint *, 'got', k * 2\n" });
+		const asks = spawnSync(process.execPath, [cli, "send", "lfortran"], { cwd: project, env: named, encoding: "utf8", timeout: 30000, input: "read(*, *) k\nprint *, 'got', k * 2\n" });
 		assert.match(asks.stdout, /```\n\nTo answer it from here: agent-repl input <text>\n?$/, asks.stdout);
 		assert.match(run("input", "3").stdout, /got\s+6/);
+		// The person's cells are recorded under their name, with agent-repl's request IDs.
+		const recordPath = /Clean shared record: (\S+) \(/.exec(run("status", "lfortran").stdout)?.[1];
+		assert.ok(recordPath);
+		const theirs = () => JSON.parse(readFileSync(recordPath, "utf8")).entries.filter((entry) => entry.requestId.startsWith("cli:send:"));
+		const deadline = Date.now() + 10000;
+		while (!(theirs().length === 2 && theirs().every((entry) => entry.status === "captured")) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 100));
+		assert.deepEqual(theirs().map((entry) => [entry.label, entry.mode, entry.status]), [["Ada", "raw", "captured"], ["Ada", "raw", "captured"]]);
+		assert.match(theirs()[0].id, /^pi-repl:cli:send:[0-9a-f-]{36}$/);
+		assert.match(theirs()[1].output, /got\s+6/);
+		const exported = run("export", "lfortran");
+		const exportPath = /^Exported \d+ clean record entries to (\S+\.md)$/m.exec(exported.stdout)?.[1];
+		assert.ok(exportPath, exported.stdout + exported.stderr);
+		assert.match(readFileSync(exportPath, "utf8"), /## \d+\. Ada\n[\s\S]*got\s+6/);
+		const options = spawnSync(process.execPath, [cli, "send", "lfortran", "--notice", "5"], { cwd: project, env, encoding: "utf8", timeout: 30000, input: "print *, n\n" });
+		assert.deepEqual([options.status, options.stderr.trim()], [1, "Nothing was sent: --notice and --lease-wait are for the pane runtimes, not LFortran."]);
 
 		assert.match(run("status", "lfortran").stdout, /The helper and kernel: ready/);
 		const attach = run("attach", "lfortran");

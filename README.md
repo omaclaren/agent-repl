@@ -130,7 +130,7 @@ When code outlasts `repl_send`'s wait, the tool returns, but the code goes on: t
 
 `agent-repl lfortran`, or `repl_start` with `runtime: "lfortran"`, starts LFortran's shared session, `pi-repl-lfortran`. It needs a build of LFortran's `main` branch, found as `lfortran` by your login shell. You work at LFortran's own prompt in the session's first window. The agent's cells go to the same kernel through pi-repl's helper in the second, so you share one set of variables, and your prompt shows the agent's cells when you next press Enter there.
 
-When one of the agent's cells waits on a READ, the agent answers it with `repl_input`, or you can answer it yourself with `agent-repl input <text>`. Unlike the other runtimes, the agent isn't told what you run at your prompt, echo settings don't apply, and there is no clean record or export yet. The [pi-repl README](https://github.com/omaclaren/pi-repl#lfortran-sessions-experimental) describes the session and LFortran's current limits.
+When one of the agent's cells waits on a READ, the agent answers it with `repl_input`, or you can answer it yourself with `agent-repl input <text>`. The cells sent through agent-repl, the agent's and `agent-repl send lfortran`'s, are in the session's clean record, as the other runtimes' sends are, and `agent-repl export lfortran` writes it as Markdown. The cells you run at your prompt aren't recorded, and unlike the other runtimes, the agent isn't told about them and echo settings don't apply. The [pi-repl README](https://github.com/omaclaren/pi-repl#lfortran-sessions-experimental) describes the session and LFortran's current limits.
 
 ## Echo setting
 

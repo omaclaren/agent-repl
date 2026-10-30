@@ -4,7 +4,7 @@
 // design for people's sends: refuse rather than truncate, and keep waiting at
 // the first Ctrl-C.
 import { hostContext, loadPiRepl, type Level } from "./host.js";
-import { buildReplEnvInspectionCode, formatReplCommandContent, formatReplEnvResult, formatReplSendResult, personRequestId, resolvePersonName, sendAndSettle } from "./pi-repl.js";
+import { buildReplEnvInspectionCode, formatReplCommandContent, formatReplEnvResult, formatReplSendResult, personRequestId, resolvePersonName, sendAndSettle, sendLfortranForHost } from "./pi-repl.js";
 
 /** The longest code pi-repl's record keeps whole, after newline normalisation. */
 export const MAX_CODE_CHARS = 200_000;
@@ -124,6 +124,17 @@ export async function sendFromStdin(cwd: string, args: SendArgs, code: string, n
 		// It ran, but the record couldn't be updated: a status of its own.
 		exitCode: execution.details.recordWarning ? 2 : 0,
 	};
+}
+
+/**
+ * `agent-repl send lfortran`: LFortran's helper matches output to cells and goes on recording a cell after its
+ * sender stops waiting, so there's no lease to wait for and Ctrl-C needs no care. The result is /repl send's.
+ */
+export async function sendLfortranFromStdin(cwd: string, args: SendArgs, code: string, notify: (message: string, level: Level) => void): Promise<SettledResult> {
+	if (args.noticeSeconds !== undefined || args.leaseWaitSeconds !== undefined) throw new SendRefused("Nothing was sent: --notice and --lease-wait are for the pane runtimes, not LFortran.");
+	const { api } = loadPiRepl();
+	const result = await sendLfortranForHost(api, hostContext(cwd, notify), { code, requestId: personRequestId("cli", "send"), label: personSending() });
+	return { text: result.text, exitCode: 0 };
 }
 
 /** `agent-repl env`: /repl env's inspection, settled as a send is. */

@@ -4,6 +4,12 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+### Added
+- Generated from pi-repl 0.11.6: LFortran's session has a clean record. The cells sent through agent-repl, the agent's and `agent-repl send lfortran`'s, are recorded, `agent-repl status lfortran` shows where, and `agent-repl export lfortran` writes the record as Markdown. Cells you run at LFortran's prompt aren't recorded.
+
+### Changed
+- `agent-repl send lfortran` records under your name, with a `cli:send:` request ID, as `send` does for the other runtimes. Like `send`, it refuses empty code, invalid UTF-8 and code over 200,000 characters, and it refuses `--notice` and `--lease-wait`, which are for the pane runtimes.
+
 ## [0.4.4] — 2026-10-30
 
 ### Added
