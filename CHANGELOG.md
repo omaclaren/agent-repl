@@ -4,6 +4,8 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-10-30
+
 ### Added
 - A shortcut for `agent-repl send` for each runtime, named by its file extension: `agent-repl-py`, `-jl`, `-r`, `-hs`, `-clj`, `-rb`, `-java`, `-cpp`, `-f90`, and `agent-repl-octave`, `-matlab` and `-gnuplot` (Octave and MATLAB share `.m`). The first argument is the code, as in `agent-repl-jl 'println(1)'`, with `send`'s options after it. A first argument that starts with `-` makes them all `send`'s, as in `agent-repl-py -f script.py`, and with none the code comes from stdin.
 
