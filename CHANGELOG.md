@@ -4,6 +4,8 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+## [0.4.7] — 2026-10-30
+
 ### Added
 - `agent-repl send` takes the code as `-c <code>`, one argument, or from a file with `-f <file>` (relative to `--cwd` when given; `-f -` is stdin), as well as piped in. That's shorter from an agent's shell mode, such as Claude Code's `!`, than a heredoc: `agent-repl send python -c 'print(df.head())'`. Their values are taken whole, even when they start with `-`, and `--cwd` isn't looked for inside them. With `-c` or `-f`, stdin isn't read. Code from either is refused as piped code is when it's empty or longer than 200,000 characters, and so are a missing value, a file that can't be read, and code given twice. `-c` leaves the code in your shell history and process listings: use `-f` or stdin for anything sensitive.
 
