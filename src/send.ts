@@ -98,7 +98,7 @@ export function parseSendArgs(args: string[]): SendArgs {
 		}
 		else if (arg.startsWith("-")) throw new SendRefused(`Unknown option for agent-repl send: ${arg}`);
 		else if (parsed.runtime === undefined) parsed.runtime = arg;
-		else throw new SendRefused(`agent-repl send takes one runtime; got ${parsed.runtime} and ${arg}.`);
+		else throw new SendRefused(`agent-repl send takes one runtime; got ${parsed.runtime} and ${arg}.${parsed.code !== undefined ? " If that's part of the code, quote the code so it's one argument." : ""}`);
 	}
 	return parsed;
 }

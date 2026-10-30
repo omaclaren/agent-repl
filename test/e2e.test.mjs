@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -140,6 +140,18 @@ test("CLI: send takes the code from -c or -f, and doesn't wait for stdin then", 
 	const elsewhere = spawnSync(process.execPath, [cli, "--cwd", project, "send", "-f", "script.py"], { cwd: root, env, encoding: "utf8", timeout: 30000 });
 	assert.equal(elsewhere.status, 0, elsewhere.stderr);
 	assert.match(elsewhere.stdout, /Output:\nFROM_FILE 42\n```/);
+});
+
+test("CLI: the shortcuts send to their runtime, with the code first, send's options, or stdin", { skip, timeout: 60000 }, () => {
+	const shortcut = (args, input) => spawnSync(process.execPath, [join(dirname(cli), "bin", "agent-repl-py.js"), ...args], { cwd: project, env, encoding: "utf8", timeout: 30000, input });
+	const inline = shortcut(["\nfor i in range(2):\n    print('SHORT', i)\n", "--notice", "30"]);
+	assert.equal(inline.status, 0, inline.stderr);
+	assert.match(inline.stdout, /^agent-repl send to pi-repl-python:\n\n```\nSubmitted code:\nfor i in range\(2\):\n    print\('SHORT', i\)\n\nOutput:\nSHORT 0\nSHORT 1\n```/);
+	writeFileSync(join(project, "short.py"), "print('SHORT_FILE')\n");
+	assert.match(shortcut(["-f", "short.py"]).stdout, /Output:\nSHORT_FILE\n```/);
+	assert.match(shortcut([], "print('SHORT_STDIN')\n").stdout, /Output:\nSHORT_STDIN\n```/);
+	const unquoted = shortcut(["print", "1"]);
+	assert.deepEqual([unquoted.status, unquoted.stderr.trim()], [1, "agent-repl send takes one runtime; got python and 1. If that's part of the code, quote the code so it's one argument."]);
 });
 
 test("CLI: env runs the Python inspection as a settled send", { skip, timeout: 60000 }, () => {

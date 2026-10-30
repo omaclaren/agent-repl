@@ -109,6 +109,29 @@ Runtimes are `python`, `ipython`, `julia`, `r`, `ghci`, `clojure` (or `clj`), `r
 
 `send` runs your own code, as `repl_send` runs an agent's: `agent-repl send python -c 'print(df.head())'` for a line, `agent-repl send julia -f script.jl` for a file's text, or code piped in or from a heredoc. `-c` takes the code as one argument, even when it starts with `-`; for several lines, end the `-c` line with the opening `'`, put the code on the lines below, and close the `'` on a line of its own (the blank line before the code isn't sent). `-c` leaves the code in your shell history and process listings, so use `-f` or stdin for anything sensitive. `-f` reads the file relative to `--cwd` when that's given, and `-f -` reads stdin. With `-c` or `-f`, stdin isn't read, so they work from an agent's shell mode, such as Claude Code's `!`. It waits however long the code runs, so that the output is recorded as this send's and no other send can take it; after 20 seconds (`--notice <seconds>`) it says the code is still running. If another send has the session, it waits up to 60 seconds (`--lease-wait <seconds>`) for it to finish, and gives up without sending. Ctrl-C before the code is sent cancels it. Once it is sent, the first Ctrl-C keeps waiting, and a second stops waiting, which is unsafe: after 30 seconds another send may record the code's late output. `send` sends nothing it can't record, and refuses empty code, invalid UTF-8, and code over 200,000 characters, which the record couldn't keep whole. `env` waits the same way. `send lfortran` goes through LFortran's helper, which matches output to cells, so it needs none of this.
 
+Each runtime also has a shortcut for `send`, named by its file extension:
+
+| Shortcut | Runtime | Shortcut | Runtime |
+| --- | --- | --- | --- |
+| `agent-repl-py` | Python and IPython | `agent-repl-java` | Java |
+| `agent-repl-jl` | Julia | `agent-repl-cpp` | C++ |
+| `agent-repl-r` | R | `agent-repl-f90` | LFortran |
+| `agent-repl-hs` | GHCi | `agent-repl-octave` | Octave |
+| `agent-repl-clj` | Clojure | `agent-repl-matlab` | MATLAB |
+| `agent-repl-rb` | Ruby | `agent-repl-gnuplot` | gnuplot |
+
+The first argument is the code, and `send`'s options can follow it:
+
+```
+agent-repl-jl 'println(1)'
+agent-repl-py '
+for i in range(3):
+    print(i)
+' --notice 60
+```
+
+A first argument that starts with `-` makes all the arguments `send`'s, as in `agent-repl-py -f script.py`, and with none the code comes from stdin (`pbpaste | agent-repl-py`). Octave and MATLAB both use `.m`, so they have their names; so does gnuplot, whose extensions are little known.
+
 `attach` runs `tmux attach` in the current terminal, or switches the current client when you are already inside tmux. Without a terminal, for example when an agent runs the command, it prints the `tmux attach` command instead.
 
 These are pi-repl's `/repl` commands, and the output is pi-repl's. The [pi-repl README](https://github.com/omaclaren/pi-repl#readme) describes them in detail, including how `stop` checks that a runtime has exited and how each runtime handles submitted code.

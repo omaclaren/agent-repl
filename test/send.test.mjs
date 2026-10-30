@@ -32,7 +32,9 @@ test("send takes one runtime, --notice and --lease-wait", () => {
 	assert.throws(() => parseSendArgs(["--lease-wait=3601"]), /--lease-wait takes a number of seconds from 0 to 3600/);
 	assert.throws(() => parseSendArgs(["--notice"]), /--notice takes/);
 	assert.throws(() => parseSendArgs(["-x"]), /Unknown option for agent-repl send: -x/);
-	assert.throws(() => parseSendArgs(["python", "julia"]), /takes one runtime; got python and julia/);
+	assert.throws(() => parseSendArgs(["python", "julia"]), /^Error: agent-repl send takes one runtime; got python and julia\.$/);
+	// After -c, a second runtime is more likely code that wasn't quoted, as in agent-repl-py print 1.
+	assert.throws(() => parseSendArgs(["python", "-c", "print", "1"]), /^Error: agent-repl send takes one runtime; got python and 1\. If that's part of the code, quote the code so it's one argument\.$/);
 });
 
 test("send takes its code from -c or -f, whole, and from only one place", () => {
