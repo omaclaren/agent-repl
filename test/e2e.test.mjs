@@ -116,6 +116,28 @@ test("CLI: name sets the name your sends are recorded under, and send records un
 	assert.match(cleared.stdout, /^Removed the saved name from .*person\.json\.\nYour sends are recorded as "User"/);
 });
 
+test("CLI: send takes the code from -c or -f, and doesn't wait for stdin then", { skip, timeout: 60000 }, async () => {
+	writeFileSync(join(project, "script.py"), "total = 6 * 7\nprint('FROM_FILE', total)\n");
+	// A stdin that stays open, as an agent's shell may give a command: neither -c nor -f reads it.
+	const open = (args) => new Promise((resolve) => {
+		const child = spawn(process.execPath, [cli, "send", ...args], { cwd: project, env, stdio: ["pipe", "pipe", "pipe"] });
+		let stdout = "", stderr = "";
+		child.stdout.on("data", (chunk) => { stdout += chunk; });
+		child.stderr.on("data", (chunk) => { stderr += chunk; });
+		const timer = setTimeout(() => child.kill("SIGKILL"), 30000);
+		child.on("close", (status) => { clearTimeout(timer); child.stdin.destroy(); resolve({ status, stdout, stderr }); });
+	});
+	const inline = await open(["python", "-c", "print('FROM_C', -1)"]);
+	assert.equal(inline.status, 0, inline.stderr);
+	assert.match(inline.stdout, /Submitted code:\nprint\('FROM_C', -1\)\n\nOutput:\nFROM_C -1\n```/);
+	const file = await open(["python", "-f", "script.py"]);
+	assert.equal(file.status, 0, file.stderr);
+	assert.match(file.stdout, /Output:\nFROM_FILE 42\n```/);
+	const elsewhere = spawnSync(process.execPath, [cli, "--cwd", project, "send", "-f", "script.py"], { cwd: root, env, encoding: "utf8", timeout: 30000 });
+	assert.equal(elsewhere.status, 0, elsewhere.stderr);
+	assert.match(elsewhere.stdout, /Output:\nFROM_FILE 42\n```/);
+});
+
 test("CLI: env runs the Python inspection as a settled send", { skip, timeout: 60000 }, () => {
 	const env_ = spawnSync(process.execPath, [cli, "env"], { cwd: project, env, encoding: "utf8", timeout: 30000 });
 	assert.equal(env_.status, 0, env_.stderr);
@@ -217,7 +239,10 @@ test("CLI: send refuses empty or invalid code and bad options before anything is
 		[["python"], Buffer.from([0xff, 0x0a]), /^Nothing was sent: the code isn't valid UTF-8\.$/m],
 		[["python"], "x".repeat(200_001), /^Nothing was sent: the code is longer than 200,000 characters\.$/m],
 		[["python", "--notice", "0"], "print(1)\n", /^--notice takes a number of seconds from 1 to 3600\.$/m],
-		[["python", "-c", "print(1)"], "print(1)\n", /^Unknown option for agent-repl send: -c$/m],
+		[["python", "-c", " "], undefined, /^Nothing was sent: the code is empty\.$/m],
+		[["python", "-c", "print(1)", "-f", "x.py"], undefined, /^Nothing was sent: give the code once, with -c, -f or stdin\.$/m],
+		[["python", "-f", "missing.py"], undefined, /^Nothing was sent: missing\.py can't be read \(ENOENT/m],
+		[["python", "-x"], "print(1)\n", /^Unknown option for agent-repl send: -x$/m],
 	]) {
 		const result = send(args, input);
 		assert.equal(result.status, 1, `${args.join(" ")}: ${result.stdout}${result.stderr}`);
@@ -279,6 +304,9 @@ test("MCP and CLI: LFortran's shared session, with READs answered by repl_input 
 		const exportPath = /^Exported \d+ clean record entries to (\S+\.md)$/m.exec(exported.stdout)?.[1];
 		assert.ok(exportPath, exported.stdout + exported.stderr);
 		assert.match(readFileSync(exportPath, "utf8"), /## \d+\. Ada\n[\s\S]*got\s+6/);
+		const inline = spawnSync(process.execPath, [cli, "send", "lfortran", "-c", "print *, n * 2"], { cwd: project, env, encoding: "utf8", timeout: 30000 });
+		assert.equal(inline.status, 0, inline.stderr);
+		assert.match(inline.stdout, /Output:\n\s*82\n```/);
 		const options = spawnSync(process.execPath, [cli, "send", "lfortran", "--notice", "5"], { cwd: project, env, encoding: "utf8", timeout: 30000, input: "print *, n\n" });
 		assert.deepEqual([options.status, options.stderr.trim()], [1, "Nothing was sent: --notice and --lease-wait are for the pane runtimes, not LFortran."]);
 

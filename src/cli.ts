@@ -9,7 +9,7 @@ import { splitArgs } from "./args.js";
 import { attachArgs } from "./attach.js";
 import { hostContext, loadPiRepl, type Level } from "./host.js";
 import { runMcpServer } from "./mcp.js";
-import { CancelledSend, envSettled, parseSendArgs, readCode, SendRefused, sendFromStdin, sendLfortranFromStdin, type SettledResult } from "./send.js";
+import { CancelledSend, codeFor, envSettled, parseSendArgs, SendRefused, sendFromStdin, sendLfortranFromStdin, type SettledResult } from "./send.js";
 import { forAgentReplOutsideFences } from "./text.js";
 
 const VERSION = (JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string }).version;
@@ -22,7 +22,7 @@ Usage:
   agent-repl status [runtime]    Show running sessions
   agent-repl attach [runtime]    Open a session in this terminal
   agent-repl env [python]        Show the Python session's interpreter and environment
-  agent-repl send [runtime]      Run code from stdin in a running session, and wait until it's done
+  agent-repl send [runtime]      Run code (-c <code>, -f <file> or stdin) in a running session, and wait until it's done
   agent-repl input <text>        Answer the READ an LFortran cell from agent-repl waits on
   agent-repl name [name|--clear] Show, set or clear the name your sends are recorded under
   agent-repl export [runtime]    Write the session's record of submissions to a file
@@ -33,11 +33,14 @@ matlab, gnuplot, cpp, and lfortran (experimental; needs LFortran's main
 branch). Sessions are the tmux sessions pi-repl uses (pi-repl-python,
 pi-repl-julia, ...), shared by every agent and terminal.
 
-agent-repl send waits however long the code runs, so that its output is recorded
-and no other send takes it. --notice <seconds> (default 20) says when to report
-that it's still running; --lease-wait <seconds> (default 60) is how long to wait
-for another send to finish first. Ctrl-C before the code is sent cancels; after,
-the first press keeps waiting, and a second stops waiting, which is unsafe.
+agent-repl send takes the code as -c <code>, one argument, or from -f <file>
+(relative to --cwd; - for stdin), or else from stdin. -c leaves the code in your
+shell history and in process listings: use -f or stdin for anything sensitive.
+It waits however long the code runs, so that its output is recorded and no
+other send takes it. --notice <seconds> (default 20) says when to report that
+it's still running; --lease-wait <seconds> (default 60) is how long to wait for
+another send to finish first. Ctrl-C before the code is sent cancels; after, the
+first press keeps waiting, and a second stops waiting, which is unsafe.
 
 Environment:
   PI_REPL_ECHO_MODE     off, summary (default) or full: how much submitted code
@@ -111,16 +114,14 @@ async function main(argv: string[]): Promise<void> {
 	}
 	if (command === "attach") { await attach(rest.join(" "), cwd); return; }
 	if (command === "send") {
-		// pi-repl's /repl send takes the code from the lines below the command; here it comes from stdin.
-		if (process.stdin.isTTY) {
-			console.error("Pipe the code in, for example: echo 'print(1)' | agent-repl send python");
-			process.exitCode = 1;
-			return;
-		}
+		// pi-repl's /repl send takes the code from the lines below the command; here it comes from -c, -f or stdin.
 		await printSettled(async () => {
 			const sendArgs = parseSendArgs(rest);
+			if (sendArgs.code === undefined && sendArgs.file === undefined && process.stdin.isTTY) {
+				throw new SendRefused("Give the code with -c, a file with -f, or pipe it in, for example: agent-repl send python -c 'print(1)'");
+			}
 			const send = sendArgs.runtime?.toLowerCase() === "lfortran" ? sendLfortranFromStdin : sendFromStdin;
-			return send(cwd, sendArgs, await readCode(process.stdin), notifyStderr);
+			return send(cwd, sendArgs, await codeFor(sendArgs, cwd, process.stdin), notifyStderr);
 		});
 		return;
 	}

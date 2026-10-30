@@ -3,6 +3,8 @@
 // other send can take its late output as its own. Input and Ctrl-C follow the
 // design for people's sends: refuse rather than truncate, and keep waiting at
 // the first Ctrl-C.
+import { createReadStream } from "node:fs";
+import { resolve } from "node:path";
 import { hostContext, loadPiRepl, type Level } from "./host.js";
 import { buildReplEnvInspectionCode, formatReplCommandContent, formatReplEnvResult, formatReplSendResult, personRequestId, resolvePersonName, sendAndSettle, sendLfortranForHost } from "./pi-repl.js";
 
@@ -38,15 +40,40 @@ export async function readCode(stream: AsyncIterable<Buffer | string> & { destro
 	} catch {
 		throw new SendRefused("Nothing was sent: the code isn't valid UTF-8.");
 	}
+	return checkCode(text);
+}
+
+/** Code as the record keeps it, or refused: newlines normalised, not empty, and within the limit. */
+function checkCode(text: string): string {
 	const code = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 	if (code.length > MAX_CODE_CHARS) throw new SendRefused(`Nothing was sent: the code is longer than ${MAX_CODE_CHARS.toLocaleString("en")} characters.`);
 	if (!code.trim()) throw new SendRefused("Nothing was sent: the code is empty.");
 	return code;
 }
 
-export interface SendArgs { runtime?: string; noticeSeconds?: number; leaseWaitSeconds?: number }
+/**
+ * The code `send` was given: `-c`'s argument, the text of `-f`'s file (relative
+ * to `cwd`; `-` is stdin), or else stdin. With `-c` or a file, stdin isn't read:
+ * an agent's shell gives commands a stdin that isn't a terminal even when
+ * nothing is piped in.
+ */
+export async function codeFor(args: SendArgs, cwd: string, stdin: AsyncIterable<Buffer | string> & { destroy?: () => void }): Promise<string> {
+	if (args.code !== undefined) return checkCode(args.code);
+	if (args.file === undefined || args.file === "-") return readCode(stdin);
+	try {
+		return await readCode(createReadStream(resolve(cwd, args.file)));
+	} catch (error) {
+		if (error instanceof SendRefused) throw error;
+		throw new SendRefused(`Nothing was sent: ${args.file} can't be read (${error instanceof Error ? error.message : String(error)}).`);
+	}
+}
 
-/** `send`'s arguments after the command: a runtime, `--notice <seconds>` (1–3600) and `--lease-wait <seconds>` (0–3600). */
+export interface SendArgs { runtime?: string; noticeSeconds?: number; leaseWaitSeconds?: number; code?: string; file?: string }
+
+/**
+ * `send`'s arguments after the command: a runtime, `--notice <seconds>` (1–3600), `--lease-wait <seconds>`
+ * (0–3600), and the code as `-c <code>` or `-f <file>`, whose values are taken whole, even when they start with `-`.
+ */
 export function parseSendArgs(args: string[]): SendArgs {
 	const parsed: SendArgs = {};
 	const seconds = (flag: string, value: string | undefined, min: number) => {
@@ -61,6 +88,13 @@ export function parseSendArgs(args: string[]): SendArgs {
 		const [flag, inline] = arg.startsWith("--") && arg.includes("=") ? [arg.slice(0, arg.indexOf("=")), arg.slice(arg.indexOf("=") + 1)] : [arg, undefined];
 		if (flag === "--notice") parsed.noticeSeconds = seconds(flag, inline ?? args[++index], 1);
 		else if (flag === "--lease-wait") parsed.leaseWaitSeconds = seconds(flag, inline ?? args[++index], 0);
+		else if (arg === "-c" || arg === "-f") {
+			if (parsed.code !== undefined || parsed.file !== undefined) throw new SendRefused("Nothing was sent: give the code once, with -c, -f or stdin.");
+			const value = args[++index];
+			if (value === undefined) throw new SendRefused(arg === "-c" ? "-c takes the code to send, as one argument." : "-f takes a file to send, or - for stdin.");
+			if (arg === "-c") parsed.code = value;
+			else parsed.file = value;
+		}
 		else if (arg.startsWith("-")) throw new SendRefused(`Unknown option for agent-repl send: ${arg}`);
 		else if (parsed.runtime === undefined) parsed.runtime = arg;
 		else throw new SendRefused(`agent-repl send takes one runtime; got ${parsed.runtime} and ${arg}.`);
