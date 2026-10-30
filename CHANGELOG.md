@@ -4,6 +4,8 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+## [0.4.5] — 2026-10-30
+
 ### Added
 - Generated from pi-repl 0.11.6: LFortran's session has a clean record. The cells sent through agent-repl, the agent's and `agent-repl send lfortran`'s, are recorded, `agent-repl status lfortran` shows where, and `agent-repl export lfortran` writes the record as Markdown. Cells you run at LFortran's prompt aren't recorded.
 
