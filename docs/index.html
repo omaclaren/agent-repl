@@ -13,7 +13,7 @@
   <meta property="og:image" content="https://omaclaren.github.io/agent-repl/assets/demo-poster.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="color-scheme" content="light">
-  <link rel="stylesheet" href="style.css?v=2">
+  <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
@@ -22,6 +22,7 @@
       <a class="brand" href="./">agent-repl</a>
       <nav aria-label="Main navigation">
         <a href="#demo">Demo</a>
+        <a href="#fortran">Fortran</a>
         <a href="#setup">Install</a>
         <a href="https://github.com/omaclaren/agent-repl#readme">Documentation</a>
       </nav>
@@ -54,6 +55,34 @@
             <li>Pi integrates a Lorenz trajectory, stores it as <code>a</code> and plots the attractor.</li>
             <li>The operator sends <code>b = odeint(lorenz, [1.0001, 1, 1], t)</code> with <code>!agent-repl-py</code>, from Pi’s shell mode.</li>
             <li>Claude Code uses <code>a</code> and <code>b</code> to plot how their separation grows. Both plots appear inline on the REPL page.</li>
+          </ol>
+        </details>
+      </section>
+      <section id="fortran" class="fortran" aria-labelledby="fortran-title">
+        <h2 id="fortran-title">Even Fortran</h2>
+        <p>agent-repl also works with <a href="https://lfortran.org">LFortran</a>’s interactive kernel. You send cells with <code>agent-repl-f90</code>, the agents send theirs through their tools, and they all run in the same kernel. This is experimental while LFortran’s REPL matures.</p>
+        <figure>
+          <video controls playsinline preload="metadata" width="1600" height="900" poster="assets/demo-lfortran-poster.png" aria-label="Pi, an operator and Claude Code sharing an LFortran REPL" aria-describedby="fortran-caption">
+            <source src="assets/shared-repl-demo-lfortran.mp4" type="video/mp4">
+            <p><a href="assets/shared-repl-demo-lfortran.mp4">Watch or download the Fortran demo.</a></p>
+          </video>
+          <figcaption id="fortran-caption">
+            <p>The same Lorenz example in Fortran. Pi integrates an orbit and plots it with <a href="https://github.com/fortran-lang/fplotlib">fplotlib</a>. The operator adds a second orbit from a nearby start, then Claude Code plots how far apart they get.</p>
+            <p class="recording-note">As above, the video is silent and runs in real time, with automated typing. Internal metadata has been redacted for this recording.</p>
+          </figcaption>
+        </figure>
+        <p class="demo-links">
+          <a href="assets/shared-repl-demo-lfortran.mp4">Open video</a>
+          <a href="https://github.com/omaclaren/agent-repl/blob/master/docs/assets/science.f90">Fortran example</a>
+          <a href="https://github.com/omaclaren/agent-repl#lfortran-experimental">LFortran notes</a>
+        </p>
+        <details>
+          <summary>Details of the Fortran demo</summary>
+          <p>A setup cell, sent before filming, loads fplotlib and defines a Runge–Kutta step and an <code>orbit</code> subroutine. fplotlib is built with the same LFortran, and its module files sit in the session’s folder. The step is written in scalars, because LFortran’s REPL can’t yet link some array temporaries from one cell to the next. The Fortran example includes the setup.</p>
+          <ol>
+            <li>Pi runs <code>call orbit(1d0, x, y, z)</code> and plots the attractor with fplotlib’s <code>scatter</code>.</li>
+            <li>The operator declares <code>x2</code>, <code>y2</code> and <code>z2</code> and runs <code>call orbit(1.0001d0, x2, y2, z2)</code>, in one line with <code>!agent-repl-f90</code>, from Pi’s shell mode.</li>
+            <li>Claude Code computes the separation as one array expression and plots it with <code>semilogy</code>. Both plots appear inline on the REPL page.</li>
           </ol>
         </details>
       </section>
