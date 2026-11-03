@@ -4,6 +4,8 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-11-03
+
 ### Added
 - Generated from pi-repl 0.12.0. `repl_send` and `repl_input` results tell the agent of other clients' new entries in the records of the sessions it has used, such as your `agent-repl send` cells, Pi Studio's notes and other agents' sends, and of changes to entries it was told of, within 10 entries and 8,000 characters. An entry counts as told when its result is returned uncancelled; each MCP server has its own view, starting empty. `PI_REPL_RECORD_ACTIVITY=off` stops it, and when unset it follows `PI_REPL_PANE_ACTIVITY`. A person's `agent-repl send` prints no report. See [What others send](README.md#what-others-send).
 - `repl_history`, a read-only tool: a session's record entries a page at a time, or one in full by its ID.
