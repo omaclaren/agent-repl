@@ -1,4 +1,4 @@
-// MCP server exposing pi-repl's tools (repl_start, repl_status, repl_send, repl_input).
+// MCP server exposing pi-repl's tools (repl_start, repl_status, repl_send, repl_input, repl_history).
 //
 // Pi shows a tool's description to the model and adds its prompt guidelines to
 // the system prompt. MCP has only the description, and some clients cap it
@@ -22,7 +22,7 @@ import { forAgentRepl } from "./text.js";
 
 export const INSTRUCTIONS = `agent-repl provides long-lived REPL sessions (Python/IPython, Julia, R, GHCi, Clojure, Ruby, Java, Octave, MATLAB, gnuplot, C++ and, experimentally, LFortran) running in tmux. The user can watch and type into the same session from a terminal, so treat it as shared state: inspect before changing it, and do not assume variables exist.
 
-Start or reuse a session with repl_start, choosing the runtime explicitly, then run code with repl_send. Use repl_status to check which sessions are running. When an LFortran cell waits on a READ, answer it with repl_input. Stopping or restarting a session is the user's decision; they can run \`agent-repl stop <runtime>\` in a terminal. To show the user the session, suggest \`agent-repl attach <runtime>\`.
+Start or reuse a session with repl_start, choosing the runtime explicitly, then run code with repl_send. Use repl_status to check which sessions are running, and repl_history to list a session's record entries or read one. When an LFortran cell waits on a READ, answer it with repl_input. Stopping or restarting a session is the user's decision; they can run \`agent-repl stop <runtime>\` in a terminal. To show the user the session, suggest \`agent-repl attach <runtime>\`.
 
 These are the same tmux sessions pi-repl uses (pi-repl-python, pi-repl-julia, ...), so other agents and Pi may be using them too. Messages from these tools can mention pi-repl's Pi commands /repl and /lab; outside Pi the same command is \`agent-repl\` in a terminal (\`/repl stop python\` is \`agent-repl stop python\`).`;
 
@@ -36,6 +36,9 @@ export function agentLabel(client: Implementation | undefined): string | undefin
 	if (!client) return undefined;
 	return client.title?.trim() || CLIENT_NAMES[client.name] || client.name?.trim() || undefined;
 }
+
+// Tools that only read: they change no session and no record.
+const READ_ONLY_TOOLS = new Set(["repl_status", "repl_history"]);
 
 type JsonSchema = { properties?: Record<string, { description?: string }>; [key: string]: unknown };
 
@@ -56,7 +59,7 @@ export function describeTool(tool: ToolDefinition): Tool {
 		title: tool.label,
 		description,
 		inputSchema: inputSchema as Tool["inputSchema"],
-		annotations: { title: tool.label, readOnlyHint: tool.name === "repl_status", destructiveHint: false, openWorldHint: false },
+		annotations: { title: tool.label, readOnlyHint: READ_ONLY_TOOLS.has(tool.name), destructiveHint: false, openWorldHint: false },
 	};
 }
 

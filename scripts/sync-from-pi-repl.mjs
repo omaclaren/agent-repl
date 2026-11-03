@@ -61,29 +61,41 @@ for (const ext of ["js", "d.ts"]) {
 		+ read(join(piAgent, "dist", "core", "tools", `truncate.${ext}`)).replace(/\n\/\/# sourceMappingURL=.*\n?$/, "\n"));
 	writeFileSync(join(compat, `exec.${ext}`), banner("@earendil-works/pi-coding-agent dist/core/exec", piAgentVersion)
 		+ read(join(piAgent, "dist", "core", `exec.${ext}`)).replace(`from "../utils/child-process.js"`, `from "./child-process.js"`).replace(/\n\/\/# sourceMappingURL=.*\n?$/, "\n"));
-	writeFileSync(join(compat, `string-enum.${ext}`), banner("@earendil-works/pi-ai dist/utils/typebox-helpers", piAiVersion)
-		+ read(join(piAi, "dist", "utils", `typebox-helpers.${ext}`)).replace(/\n\/\/# sourceMappingURL=.*\n?$/, "\n"));
+	// Its declaration names pi-schema's Schema, which agent-repl doesn't install; TypeBox's TUnsafe is the same shape.
+	let stringEnum = read(join(piAi, "dist", "utils", `string-enum.${ext}`));
+	if (ext === "d.ts") stringEnum = replaceExactly(stringEnum, `import type { Schema } from "@earendil-works/pi-schema";`, `import type { TUnsafe as Schema } from "typebox";`, 1, "string-enum.d.ts");
+	if (/@earendil-works\//.test(stringEnum.replace(/^ \*.*$/gm, ""))) throw new Error(`string-enum.${ext} imports a Pi package; update this script.`);
+	writeFileSync(join(compat, `string-enum.${ext}`), banner("@earendil-works/pi-ai dist/utils/string-enum", piAiVersion)
+		+ stringEnum.replace(/\n\/\/# sourceMappingURL=.*\n?$/, "\n"));
 }
 // child-process.js: only waitForChildProcess; its Windows spawn wrapper needs cross-spawn.
 const childProcess = read(join(piAgent, "dist", "utils", "child-process.js"));
-const start = childProcess.indexOf("const EXIT_STDIO_GRACE_MS");
+const grace = /^const EXIT_STDIO_GRACE_MS = \d+;\n/m.exec(childProcess)?.[0];
+const wait = childProcess.indexOf("export function waitForChildProcess");
+// From its doc comment to the end of the file, which holds nothing after it.
+const start = childProcess.lastIndexOf("\n/**", wait) + 1;
 const end = childProcess.indexOf("//# sourceMappingURL");
-if (start < 0 || !childProcess.includes("export function waitForChildProcess")) throw new Error("child-process.js changed; update this script.");
+const waitForChild = childProcess.slice(start, end < 0 ? undefined : end).trimEnd();
+if (!grace || wait < 0 || start <= 0 || childProcess.slice(start, wait).includes("\n}\n") || /\n}\n[\s\S]*\bfunction\b/.test(waitForChild)
+	|| /\b(?:crossSpawn|nodeSpawn|import|require)\b/.test(waitForChild)) throw new Error("child-process.js changed; update this script.");
 writeFileSync(join(compat, "child-process.js"), banner("@earendil-works/pi-coding-agent dist/utils/child-process (waitForChildProcess only)", piAgentVersion)
-	+ childProcess.slice(start, end < 0 ? undefined : end).trimEnd() + "\n");
-// ansi.js: pi-tui's stripTerminalSequences and the extractAnsiCode it uses, which are self-contained.
+	+ grace + waitForChild + "\n");
+// ansi.js: pi-tui's stripTerminalSequences and the extractAnsiCode and ansiCodeLength it uses, which are self-contained.
 // pi-tui's Box and Text depend on its whole TUI, so pi-compat/tui.ts has stand-ins for them instead.
 const tuiUtils = read(join(piTui, "dist", "utils.js"));
-const tuiFunction = name => {
-	const from = tuiUtils.indexOf(`export function ${name}(`);
+const tuiFunction = (name, exported = true) => {
+	const from = tuiUtils.indexOf(`\n${exported ? "export " : ""}function ${name}(`);
 	const to = tuiUtils.indexOf("\n}\n", from);
 	if (from < 0 || to < 0) throw new Error(`pi-tui's utils.js has no ${name}; update this script.`);
-	return tuiUtils.slice(from, to + 3);
+	return tuiUtils.slice(from + 1, to + 3);
 };
-const ansi = [tuiFunction("extractAnsiCode"), tuiFunction("stripTerminalSequences")].join("");
+const ansi = [tuiFunction("ansiCodeLength", false), tuiFunction("extractAnsiCode"), tuiFunction("stripTerminalSequences")].join("");
 if (/\b(?:import|require)\b/.test(ansi) || !/^export function stripTerminalSequences\(str\) \{\n    if \(!str\.includes\("\\x1b"\)\)/m.test(ansi)) throw new Error("pi-tui's stripTerminalSequences changed; update this script.");
-writeFileSync(join(compat, "ansi.js"), banner("@earendil-works/pi-tui dist/utils (extractAnsiCode and stripTerminalSequences only)", piTuiVersion) + ansi);
-writeFileSync(join(compat, "ansi.d.ts"), banner("@earendil-works/pi-tui dist/utils (extractAnsiCode and stripTerminalSequences only)", piTuiVersion)
+// The copy has to run on its own: a helper pi-tui adds to these would otherwise be missed until a pane has colour in it.
+const { stripTerminalSequences } = await import(`data:text/javascript;base64,${Buffer.from(ansi).toString("base64")}`);
+if (stripTerminalSequences("a\x1b[31mb\x1b[0m\x1b]8;;https://x\x07c\x1b]8;;\x07\x1b_m\x1b\\d") !== "abcd") throw new Error("The copy of pi-tui's stripTerminalSequences doesn't strip a CSI, OSC and APC sequence; update this script.");
+writeFileSync(join(compat, "ansi.js"), banner("@earendil-works/pi-tui dist/utils (ansiCodeLength, extractAnsiCode and stripTerminalSequences only)", piTuiVersion) + ansi);
+writeFileSync(join(compat, "ansi.d.ts"), banner("@earendil-works/pi-tui dist/utils (ansiCodeLength, extractAnsiCode and stripTerminalSequences only)", piTuiVersion)
 	+ "export declare function extractAnsiCode(str: string, pos: number): {\n    code: string;\n    length: number;\n} | null;\nexport declare function stripTerminalSequences(str: string): string;\n");
 writeFileSync(join(compat, "child-process.d.ts"), banner("@earendil-works/pi-coding-agent dist/utils/child-process (waitForChildProcess only)", piAgentVersion)
 	+ `import type { ChildProcess } from "node:child_process";\nexport declare function waitForChildProcess(child: ChildProcess): Promise<number | null>;\n`);

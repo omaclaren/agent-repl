@@ -33,10 +33,10 @@ print(f(1000))
 ## Features
 
 - **Shared sessions**: each runtime has one named tmux session (`pi-repl-python`, `pi-repl-julia`, ...), used by you, Pi and every connected agent. An agent sees variables you defined in the terminal, and you see what the agent ran.
-- **MCP tools**: `repl_start`, `repl_status`, `repl_send` and `repl_input`, with pi-repl's descriptions and guidance for each runtime.
+- **MCP tools**: `repl_start`, `repl_status`, `repl_send`, `repl_input` and `repl_history`, with pi-repl's descriptions and guidance for each runtime.
 - **Command line**: start, attach to, inspect, export and stop sessions from a terminal.
 - **Labelled submissions**: code sent by an agent appears in the pane with its output between labelled markers, as above. How much code is shown can be changed (see [Echo setting](#echo-setting)).
-- **Records**: pi-repl keeps a raw log of each session's pane and a clean record of submitted code and output, which can be exported as Markdown. Each entry in the record names the agent that sent it. A compatible [pi-studio](https://github.com/omaclaren/pi-studio) using the same session shares the clean record.
+- **Records**: pi-repl keeps a raw log of each session's pane and a clean record of submitted code and output, which can be exported as Markdown. Each entry in the record names the agent or person that sent it, and an agent is told of the entries others add (see [What others send](#what-others-send)). A compatible [pi-studio](https://github.com/omaclaren/pi-studio) using the same session shares the clean record.
 
 ## Requirements
 
@@ -142,8 +142,9 @@ These are pi-repl's `/repl` commands, and the output is pi-repl's. The [pi-repl 
 |------|-------------|
 | `repl_start` | Start or reuse a session with an explicit runtime and wait for a normal prompt |
 | `repl_status` | Report which sessions are running, with their paths and recent output |
-| `repl_send` | Run code in a running session and return the submitted code and output, after any pane text the agent hasn't seen |
+| `repl_send` | Run code in a running session and return the submitted code and output, after any record entries and pane text the agent hasn't seen |
 | `repl_input` | Answer the READ that an LFortran cell sent by `repl_send` is waiting on |
+| `repl_history` | List a session's record entries, a page at a time, or show one in full by its ID, changing nothing |
 
 When code outlasts `repl_send`'s wait, the tool returns, but the code goes on: the MCP server keeps the session for it, records its output when it finishes, and the result tells the agent not to send it again. `agent-repl status` shows which send holds a session. When its client disconnects, the server waits for such sends before it exits, saying so on stderr. A client that kills it sooner (the MCP SDK allows about four seconds) leaves that send without an owner; its lease then goes stale after 30 seconds, and a later send may record the code's late output.
 
@@ -153,7 +154,7 @@ When code outlasts `repl_send`'s wait, the tool returns, but the code goes on: t
 
 `agent-repl lfortran`, or `repl_start` with `runtime: "lfortran"`, starts LFortran's shared session, `pi-repl-lfortran`. It needs a build of LFortran's `main` branch, found as `lfortran` by your login shell. You work at LFortran's own prompt in the session's first window. The agent's cells go to the same kernel through pi-repl's helper in the second, so you share one set of variables, and your prompt shows the agent's cells when you next press Enter there.
 
-When one of the agent's cells waits on a READ, the agent answers it with `repl_input`, or you can answer it yourself with `agent-repl input <text>`. The cells sent through agent-repl, the agent's and `agent-repl send lfortran`'s, are in the session's clean record, as the other runtimes' sends are, and `agent-repl export lfortran` writes it as Markdown. The cells you run at your prompt aren't recorded, and unlike the other runtimes, the agent isn't told about them and echo settings don't apply. The [pi-repl README](https://github.com/omaclaren/pi-repl#lfortran-sessions-experimental) describes the session and LFortran's current limits.
+When one of the agent's cells waits on a READ, the agent answers it with `repl_input`, or you can answer it yourself with `agent-repl input <text>`. The cells sent through agent-repl, the agent's and `agent-repl send lfortran`'s, are in the session's clean record, as the other runtimes' sends are, and `agent-repl export lfortran` writes it as Markdown. The agent is told of the cells others send through agent-repl, as for the other runtimes (see [What others send](#what-others-send)). The cells you run at your prompt aren't recorded, and unlike the other runtimes, there's no pane text either, so the agent isn't told about them, and echo settings don't apply. The [pi-repl README](https://github.com/omaclaren/pi-repl#lfortran-sessions-experimental) describes the session and LFortran's current limits.
 
 ## Echo setting
 
@@ -177,9 +178,17 @@ Entries in the clean record, and in `agent-repl export`, are labelled with the n
 
 That text, including anything you type, reaches the agent and its model provider. To stop it, set `PI_REPL_PANE_ACTIVITY=off` in the server's environment, as for the echo setting. In Pi, pi-repl also adds this text when a run starts, before the model plans; an MCP server can't do that, so here `on` (the default) and `send` both report only in send results. It stops reports while it is set but does not erase the pane's history. The MCP server can't tell when an agent clears or compacts its own context, so after that the agent may lack pane text it was shown before.
 
+## What others send
+
+`repl_send` and `repl_input` results also tell the agent of new entries in the clean records of the sessions it has started or sent to: your `agent-repl send` and `env` cells, Pi's and Pi Studio's sends and notes, and other agents' sends, with who sent each and how (`Ada · via terminal`), its status, code and output. An entry it was told of that changes, such as code that was still running, is told again as an update. Each result holds at most 10 entries and 8,000 characters, and lists the IDs of any left out; `repl_history` shows them. The agent's own sends aren't told back: they're known by entry ID, so two agents that both call themselves `Claude Code` are still told of each other's. These reports come before the pane text, and are labelled as data from the shared session, not instructions from whoever they name.
+
+An MCP server can't see the agent's context, so an entry counts as told once a result holding it is returned, unless the agent cancelled the call; then it's told again. Each server keeps its own view of what it has told, starting empty, so a restarted server tells the latest entries again. As with pane text, it can't tell when an agent clears or compacts its context.
+
+That text, including other people's code and names, reaches the agent and its model provider. `PI_REPL_RECORD_ACTIVITY=off` in the server's environment stops it; `send`, which in Pi stops the report at the start of a run, is the same as `on` here. When it isn't set it follows `PI_REPL_PANE_ACTIVITY`, so turning pane text off turns this off too. `repl_history` works either way.
+
 ## Privacy and safety
 
-An agent's code runs in your REPL with your permissions, and it is shown what you type in a session (see above). Whether the agent asks before calling a tool is decided by the agent's own permission settings. Anyone who can reach your tmux server can see and type into these sessions.
+An agent's code runs in your REPL with your permissions, and it is shown what you type in a session and what others send there (see above). Whether the agent asks before calling a tool is decided by the agent's own permission settings. Anyone who can reach your tmux server can see and type into these sessions.
 
 pi-repl writes submitted code to private temporary files (mode `0600`, in a directory only you can read) and removes them after each run. The raw session log and the clean record are kept in similar private directories under your temporary directory. The log is not deleted automatically; the clean record keeps the most recent 300 submissions. `PI_REPL_CONTROL_ROOT` moves the temporary code files to another directory, which must be owned by you with mode `0700`.
 

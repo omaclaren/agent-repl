@@ -62,7 +62,9 @@ export interface ExtensionAPI {
 	registerCommand(name: string, options: CommandDefinition): void;
 	// Pi's conversation and run events. agent-repl's host has none: one MCP
 	// server serves one agent conversation, and nothing is added at run start.
-	on?(event: string, handler: (event: unknown, ctx: ExtensionContext) => unknown): void;
+	on?(event: string, handler: (event: { readonly [key: string]: unknown }, ctx: ExtensionContext) => unknown): void;
+	// Pi's event bus between extensions, such as Pi Studio's. agent-repl's host has none.
+	events?: { on?(channel: string, handler: (data: unknown) => void): unknown };
 	// Messages in Pi's conversation. agent-repl's host has none: pi-repl shows a
 	// command's result as a notice instead, and the renderer it registers is unused.
 	sendMessage?(message: CustomMessage, options?: { triggerTurn?: boolean }): void;

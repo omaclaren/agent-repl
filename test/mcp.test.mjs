@@ -14,11 +14,11 @@ async function connect(clientInfo = { name: "test", version: "0" }) {
 	return { client, close: () => Promise.all([client.close(), server.close()]) };
 }
 
-test("lists pi-repl's four tools with its descriptions and guidelines", async (t) => {
+test("lists pi-repl's five tools with its descriptions and guidelines", async (t) => {
 	const { client, close } = await connect();
 	t.after(close);
 	const { tools } = await client.listTools();
-	assert.deepEqual(tools.map(tool => tool.name).sort(), ["repl_input", "repl_send", "repl_start", "repl_status"]);
+	assert.deepEqual(tools.map(tool => tool.name).sort(), ["repl_history", "repl_input", "repl_send", "repl_start", "repl_status"]);
 	const instructions = client.getInstructions();
 	// Claude Code caps tool descriptions and server instructions at 2,048 characters.
 	assert.ok(instructions.length <= 2048);

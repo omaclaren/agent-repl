@@ -325,6 +325,19 @@ test("MCP and CLI: LFortran's shared session, with READs answered by repl_input 
 		assert.match(inline.stdout, /Output:\n\s*82\n```/);
 		const options = spawnSync(process.execPath, [cli, "send", "lfortran", "--notice", "5"], { cwd: project, env, encoding: "utf8", timeout: 30000, input: "print *, n\n" });
 		assert.deepEqual([options.status, options.stderr.trim()], [1, "Nothing was sent: --notice and --lease-wait are for the pane runtimes, not LFortran."]);
+		// The agent is told of the person's three cells with its next send, once; not of its own first cell, whose result showed how it ended.
+		// A person's send prints no report.
+		for (const result of [piped, asks, inline]) assert.doesNotMatch(result.stdout, /Recorded REPL activity|^\[entry /m);
+		const entryLines = output => output.match(/^\[(?:updated · )?entry [^\]]*\]$/gm) ?? [];
+		const told = text(await client.callTool({ name: "repl_send", arguments: { code: "print *, n + 2", target: "lfortran" } }));
+		assert.match(told, /Output:\n\s*43\s*$/);
+		const lines = entryLines(told);
+		assert.equal(lines.filter(line => /^\[entry \S+ · (?:Ada|User) · via terminal · captured · /.test(line)).length, 3, told);
+		// Its own cells are known by their execution lines; one whose READ the person answered may come back as an update.
+		assert.ok(lines.every(line => !/^\[entry \S+ · E2E Agent · /.test(line)), told);
+		assert.doesNotMatch(told, /n = 41/);
+		assert.match(told, /got\s+6/);
+		assert.deepEqual(entryLines(text(await client.callTool({ name: "repl_send", arguments: { code: "print *, n + 3", target: "lfortran" } }))), []);
 
 		assert.match(run("status", "lfortran").stdout, /The helper and kernel: ready/);
 		const attach = run("attach", "lfortran");
