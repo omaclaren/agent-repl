@@ -4,6 +4,12 @@ Shared REPL sessions for coding agents. agent-repl starts a Python, IPython, Jul
 
 agent-repl is [pi-repl](https://github.com/omaclaren/pi-repl) running outside [Pi](https://pi.dev). The tools, runtime support and session handling are pi-repl's own code. agent-repl adds an MCP server and a command-line interface in place of Pi's extension API.
 
+## Demo
+
+[![Pi, an operator and Claude Code sharing a Python REPL](docs/assets/demo-poster.png)](https://omaclaren.github.io/agent-repl/#demo)
+
+[Watch the one-minute demo](https://omaclaren.github.io/agent-repl/#demo): Pi plots a Lorenz orbit, the operator sends a nearby trajectory, and Claude Code reuses both. The [browser preview](https://omaclaren.github.io/agent-markdown-preview/) shows the code and figures inline. The recording uses automated typing, with internal metadata redacted.
+
 Here Claude Code defined `f` and printed two values, and Codex, started separately, then called the same `f`. This is the Python session's tmux pane, with the paths of the private files that carry each submission shortened:
 
 ```text
