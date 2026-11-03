@@ -67,7 +67,6 @@ video {
 }
 figcaption { max-width: 760px; padding-top: 14px; font-size: 16px; }
 figcaption p { margin: 0 0 10px; }
-.recording-note { color: var(--muted); font-size: 14px; }
 .demo-links { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 16px 0; font-size: 14px; }
 details {
   padding: 14px 0;

@@ -19,8 +19,6 @@ test("the landing page uses opt-in native video players and text alternatives", 
 	assert.match(html, /<details>[\s\S]*Details of the demo/);
 	assert.match(html, /<details>[\s\S]*Details of the Fortran demo/);
 	assert.match(html, /experimental while LFortran’s REPL matures/);
-	assert.match(html, /automated typing/);
-	assert.match(html, /redacted for this recording/);
 	assert.match(html, /name="viewport"/);
 	assert.ok(existsSync(new URL(".nojekyll", docs)));
 });

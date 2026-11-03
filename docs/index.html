@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>agent-repl — shared REPL sessions for coding agents</title>
-  <meta name="description" content="Work in the same Python, Julia, R or other REPL as your coding agents. Includes a shared-session demo and installation instructions.">
+  <meta name="description" content="Work in the same Python, Julia, R, Fortran or other REPL as your coding agents. Includes shared-session demos and installation instructions.">
   <link rel="canonical" href="https://omaclaren.github.io/agent-repl/">
   <meta property="og:type" content="website">
   <meta property="og:title" content="agent-repl — shared REPL sessions for coding agents">
-  <meta property="og:description" content="Work in the same Python, Julia, R or other REPL as your coding agents. Includes a shared-session demo and installation instructions.">
+  <meta property="og:description" content="Work in the same Python, Julia, R, Fortran or other REPL as your coding agents. Includes shared-session demos and installation instructions.">
   <meta property="og:url" content="https://omaclaren.github.io/agent-repl/">
   <meta property="og:image" content="https://omaclaren.github.io/agent-repl/assets/demo-poster.png">
   <meta name="twitter:card" content="summary_large_image">
@@ -30,7 +30,7 @@
     <main id="main">
       <section class="intro" aria-labelledby="title">
         <h1 id="title">Shared REPL sessions for coding agents</h1>
-        <p>agent-repl lets you and your coding agents work in the same running Python, Julia, R or other supported session. Agents can use the variables and functions you define at the prompt, and you can inspect or change theirs as you work.</p>
+        <p>agent-repl lets you and your coding agents work in the same running Python, Julia, R or other session (<a href="#runtimes">see the list below</a>). Agents can use the variables and functions you define, and you can inspect or change theirs as you work.</p>
       </section>
       <section id="demo" aria-label="Recorded shared REPL demo">
         <figure>
@@ -40,7 +40,6 @@
           </video>
           <figcaption id="demo-caption">
             <p>In this one-minute example, Pi integrates a Lorenz trajectory and stores it as <code>a</code>. The operator adds <code>b</code> from a nearby starting point, then Claude Code uses both arrays to plot their separation.</p>
-            <p class="recording-note">The video is silent and runs in real time, with automated typing. Internal metadata has been redacted for this recording.</p>
           </figcaption>
         </figure>
         <p class="demo-links">
@@ -68,7 +67,6 @@
           </video>
           <figcaption id="fortran-caption">
             <p>The same Lorenz example in Fortran. Pi integrates an orbit and plots it with <a href="https://github.com/fortran-lang/fplotlib">fplotlib</a>. The operator adds a second orbit from a nearby start, then Claude Code plots how far apart they get.</p>
-            <p class="recording-note">As above, the video is silent and runs in real time, with automated typing. Internal metadata has been redacted for this recording.</p>
           </figcaption>
         </figure>
         <p class="demo-links">
@@ -88,6 +86,7 @@
       </section>
       <section id="setup" class="guide" aria-labelledby="install-title">
         <h2 id="install-title">Installation</h2>
+        <p id="runtimes">agent-repl supports Python or IPython, Julia, R, Haskell (GHCi), Clojure, Ruby (irb), Java (jshell), C++ (cling), Octave, MATLAB, gnuplot and, experimentally, Fortran (LFortran). Each has a shortcut for sending code, such as <code>agent-repl-py</code> or <code>agent-repl-f90</code>.</p>
         <p>You need Node.js 22 or later, <a href="https://github.com/tmux/tmux">tmux</a> and the runtime you want to use. To install agent-repl and start Python:</p>
         <pre><code>npm install -g agent-repl
 agent-repl python -d</code></pre>
