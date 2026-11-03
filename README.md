@@ -140,7 +140,7 @@ A first argument that starts with `-` makes all the arguments `send`'s, as in `a
 
 `attach` runs `tmux attach` in the current terminal, or switches the current client when you are already inside tmux. Without a terminal, for example when an agent runs the command, it prints the `tmux attach` command instead.
 
-These are pi-repl's `/repl` commands, and the output is pi-repl's. The [pi-repl README](https://github.com/omaclaren/pi-repl#readme) describes them in detail, including how `stop` checks that a runtime has exited and how each runtime handles submitted code.
+These are pi-repl's `/repl` commands, and the output is pi-repl's. pi-repl's docs describe them in detail, including [how `stop` checks that a runtime has exited](https://github.com/omaclaren/pi-repl/blob/main/docs/details.md#stopping-safely) and [how each runtime handles submitted code](https://github.com/omaclaren/pi-repl/blob/main/docs/runtimes.md).
 
 ## Tools
 
@@ -160,7 +160,7 @@ When code outlasts `repl_send`'s wait, the tool returns, but the code goes on: t
 
 `agent-repl lfortran`, or `repl_start` with `runtime: "lfortran"`, starts LFortran's shared session, `pi-repl-lfortran`. It needs a build of LFortran's `main` branch, found as `lfortran` by your login shell. You work at LFortran's own prompt in the session's first window. The agent's cells go to the same kernel through pi-repl's helper in the second, so you share one set of variables, and your prompt shows the agent's cells when you next press Enter there.
 
-When one of the agent's cells waits on a READ, the agent answers it with `repl_input`, or you can answer it yourself with `agent-repl input <text>`. The cells sent through agent-repl, the agent's and `agent-repl send lfortran`'s, are in the session's clean record, as the other runtimes' sends are, and `agent-repl export lfortran` writes it as Markdown. The agent is told of the cells others send through agent-repl, as for the other runtimes (see [What others send](#what-others-send)). The cells you run at your prompt aren't recorded, and unlike the other runtimes, there's no pane text either, so the agent isn't told about them, and echo settings don't apply. The [pi-repl README](https://github.com/omaclaren/pi-repl#lfortran-sessions-experimental) describes the session and LFortran's current limits.
+When one of the agent's cells waits on a READ, the agent answers it with `repl_input`, or you can answer it yourself with `agent-repl input <text>`. The cells sent through agent-repl, the agent's and `agent-repl send lfortran`'s, are in the session's clean record, as the other runtimes' sends are, and `agent-repl export lfortran` writes it as Markdown. The agent is told of the cells others send through agent-repl, as for the other runtimes (see [What others send](#what-others-send)). The cells you run at your prompt aren't recorded, and unlike the other runtimes, there's no pane text either, so the agent isn't told about them, and echo settings don't apply. [pi-repl's runtime notes](https://github.com/omaclaren/pi-repl/blob/main/docs/runtimes.md#lfortran-sessions-experimental) describe the session and LFortran's current limits.
 
 ## Echo setting
 
