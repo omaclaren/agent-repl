@@ -45,7 +45,7 @@
         <p class="demo-links">
           <a href="assets/shared-repl-demo.mp4">Open video</a>
           <a href="https://github.com/omaclaren/agent-repl/blob/master/docs/assets/science.py">Python example</a>
-          <a href="https://omaclaren.github.io/agent-markdown-preview/">Browser preview</a>
+          <a href="https://omaclaren.github.io/agent-markdown-preview/">agent-markdown-preview</a>
         </p>
         <details>
           <summary>Details of the demo</summary>
@@ -92,6 +92,7 @@
 agent-repl python -d</code></pre>
         <p>Add the tools to Claude Code:</p>
         <pre><code>claude mcp add --scope user agent-repl -- agent-repl mcp</code></pre>
+        <p>Or ask your agent to set it up: “Install agent-repl from <a href="https://github.com/omaclaren/agent-repl">https://github.com/omaclaren/agent-repl</a> and add it to your MCP servers.” Start a new session afterwards, so it loads the tools.</p>
         <p>Ask Claude Code to use the shared Python REPL. To work at the same prompt yourself, run <code>agent-repl attach python</code> in another terminal. The Lorenz example also needs NumPy, SciPy and Matplotlib.</p>
         <p>The <a href="https://github.com/omaclaren/agent-repl#setting-up-an-agent">setup guide</a> covers Codex, OpenCode and other MCP clients.</p>
         <h2>Pi and the browser preview</h2>

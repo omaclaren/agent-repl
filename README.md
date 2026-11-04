@@ -8,7 +8,7 @@ agent-repl is [pi-repl](https://github.com/omaclaren/pi-repl) running outside [P
 
 [![Pi, an operator and Claude Code sharing a Python REPL](docs/assets/demo-poster.png)](https://omaclaren.github.io/agent-repl/#demo)
 
-[Watch the one-minute demo](https://omaclaren.github.io/agent-repl/#demo): Pi plots a Lorenz orbit, the operator sends a nearby trajectory, and Claude Code reuses both. The [browser preview](https://omaclaren.github.io/agent-markdown-preview/) shows the code and figures inline. The recording uses automated typing, with internal metadata redacted.
+[Watch the one-minute demo](https://omaclaren.github.io/agent-repl/#demo): Pi plots a Lorenz orbit, the operator sends a nearby trajectory, and Claude Code reuses both. The browser preview, from [agent-markdown-preview](https://omaclaren.github.io/agent-markdown-preview/), shows the code and figures inline. The recording uses automated typing.
 
 Here Claude Code defined `f` and printed two values, and Codex, started separately, then called the same `f`. This is the Python session's tmux pane, with the paths of the private files that carry each submission shortened:
 
@@ -57,6 +57,8 @@ agent-repl is an early release, developed and tested on macOS. pi-repl also supp
 ```bash
 npm install -g agent-repl
 ```
+
+Or ask your agent to install and set it up: "Install agent-repl from https://github.com/omaclaren/agent-repl and add it to your MCP servers, following the README." Start a new session afterwards, so it loads the tools.
 
 ## Setting up an agent
 
