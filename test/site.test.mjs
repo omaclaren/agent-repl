@@ -47,10 +47,10 @@ test("the public asset list is limited to the reviewed recordings, posters and e
 	assert.match(code, /np\.linalg\.norm\(a - b, axis=1\)/);
 	assert.doesNotMatch(code, /\/Users\/|<\/?cwd>|\?token=/i);
 	const fortran = readFileSync(new URL("assets/shared-repl-demo-lfortran.mp4", docs));
-	assert.equal(createHash("sha256").update(fortran).digest("hex"), "e1e65820737f292f3a1acd289e59d2350573333eb3c9f70b5f0518307016db08");
-	assert.equal(fortran.length, 2373456);
+	assert.equal(createHash("sha256").update(fortran).digest("hex"), "ae1c4ec95d507f80b5fcd8dd331d030a68a058fe4c3e1af4033615e437eb5c7f");
+	assert.equal(fortran.length, 2111200);
 	const f90 = readFileSync(new URL("assets/science.f90", docs), "utf8");
-	assert.match(f90, /subroutine orbit\(x0, x, y, z\)/);
+	assert.match(f90, /subroutine orbit\(x0, u\)/);
 	assert.match(f90, /call semilogy\(t, d\)/);
 	assert.doesNotMatch(f90, /\/Users\/|\/tmp\/|<\/?cwd>|\?token=/i);
 });

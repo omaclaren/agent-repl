@@ -76,11 +76,11 @@
         </p>
         <details>
           <summary>Details of the Fortran demo</summary>
-          <p>A setup cell, sent before filming, loads fplotlib and defines a Runge–Kutta step and an <code>orbit</code> subroutine. fplotlib is built with the same LFortran, and its module files sit in the session’s folder. The step is written in scalars, because LFortran’s REPL can’t yet link some array temporaries from one cell to the next. The Fortran example includes the setup. The typing is automated. The agents’ replies and the code they run are real, recorded in real time.</p>
+          <p>A setup cell, sent before filming, loads fplotlib and defines the Lorenz equations and an <code>orbit</code> subroutine that integrates them by Runge–Kutta. fplotlib is built with the same LFortran, and its module files sit in the session’s folder. The Fortran example includes the setup. The typing is automated. The agents’ replies and the code they run are real, recorded in real time.</p>
           <ol>
-            <li>Pi runs <code>call orbit(1d0, x, y, z)</code> and plots the attractor with fplotlib’s <code>scatter</code>.</li>
-            <li>The operator declares <code>x2</code>, <code>y2</code> and <code>z2</code> and runs <code>call orbit(1.0001d0, x2, y2, z2)</code>, in one line with <code>!agent-repl-f90</code>, from Pi’s shell mode.</li>
-            <li>Claude Code computes the separation as one array expression and plots it with <code>semilogy</code>. Both plots appear inline on the REPL page.</li>
+            <li>Pi runs <code>call orbit(1d0, a)</code> and plots the attractor with fplotlib’s <code>plot</code>.</li>
+            <li>The operator declares <code>b</code> and runs <code>call orbit(1.0001d0, b)</code>, in one line with <code>!agent-repl-f90</code>, from Pi’s shell mode.</li>
+            <li>Claude Code computes the separation with <code>norm2(a - b, dim=1)</code> and plots it with <code>semilogy</code>. Both plots appear inline on the REPL page.</li>
           </ol>
         </details>
       </section>
