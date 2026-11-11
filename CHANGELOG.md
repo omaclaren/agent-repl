@@ -4,6 +4,12 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-11-11
+
+### Fixed
+- Generated from pi-repl 0.12.2. A Python cell's output no longer starts with the `exec(open(…))` line agent-repl types to run it when IPython or Python's own REPL wraps that line across rows, as they do in a pane narrower than the line. IPython 8 starts each further row with `...:`, IPython 9 with `⋮`, and Python 3.13 and later end each full row with `\`. agent-repl removed the line only when it fitted on one row.
+- When other clients' new entries didn't fit in a `repl_send` or `repl_input` result, the agent's own send wasn't counted as told either, so a later result could report the agent's own cell back to it. It now counts once its result is returned (pi-repl 0.12.1).
+
 ## [0.6.0] — 2026-11-03
 
 ### Added
