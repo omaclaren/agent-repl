@@ -12,6 +12,7 @@ export const SHORTCUTS: Readonly<Record<string, string>> = {
 	"agent-repl-rb": "ruby",
 	"agent-repl-java": "java",
 	"agent-repl-cpp": "cpp",
+	"agent-repl-rs": "rust",
 	"agent-repl-f90": "lfortran",
 	"agent-repl-octave": "octave",
 	"agent-repl-matlab": "matlab",

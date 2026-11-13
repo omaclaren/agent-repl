@@ -29,9 +29,9 @@ Usage:
   agent-repl stop [runtime]      Stop a session
 
 Runtimes: python, ipython, julia, r, ghci, clojure (clj), ruby, java, octave,
-matlab, gnuplot, cpp, and lfortran (experimental; needs LFortran's main
-branch). Sessions are the tmux sessions pi-repl uses (pi-repl-python,
-pi-repl-julia, ...), shared by every agent and terminal.
+matlab, gnuplot, cpp, rust (experimental; evcxr), and lfortran (experimental;
+needs LFortran's main branch). Sessions are the tmux sessions pi-repl uses
+(pi-repl-python, pi-repl-julia, ...), shared by every agent and terminal.
 
 agent-repl send takes the code as -c <code>, one argument, or from -f <file>
 (relative to --cwd; - for stdin), or else from stdin. -c's code can start on the
@@ -43,11 +43,11 @@ it's still running; --lease-wait <seconds> (default 60) is how long to wait for
 another send to finish first. Ctrl-C before the code is sent cancels; after, the
 first press keeps waiting, and a second stops waiting, which is unsafe.
 
-Shortcuts: agent-repl-py, -jl, -r, -hs, -clj, -rb, -java, -cpp, -f90, -octave,
--matlab and -gnuplot are agent-repl send for their runtime. The first argument
-is the code, as in agent-repl-jl 'println(1)', with send's options after it. A
-first argument starting with - makes them all send's (agent-repl-py -f
-script.py), and with none the code comes from stdin.
+Shortcuts: agent-repl-py, -jl, -r, -hs, -clj, -rb, -java, -cpp, -rs, -f90,
+-octave, -matlab and -gnuplot are agent-repl send for their runtime. The first
+argument is the code, as in agent-repl-jl 'println(1)', with send's options
+after it. A first argument starting with - makes them all send's (agent-repl-py
+-f script.py), and with none the code comes from stdin.
 
 Environment:
   PI_REPL_ECHO_MODE     off, summary (default) or full: how much submitted code

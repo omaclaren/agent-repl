@@ -4,6 +4,9 @@ All notable changes to `agent-repl` are documented here.
 
 ## [Unreleased]
 
+### Added
+- Generated from pi-repl 0.13.0. An experimental Rust runtime, `rust`: evcxr's own REPL (`evcxr`) in the `pi-repl-rust` session, with the shortcut `agent-repl-rs`. Each cell is pasted whole at evcxr's prompt, under a `// pi-repl <id>` comment line, and only when evcxr is waiting at an empty prompt; otherwise nothing is sent and the result says why. evcxr runs with a private settings folder holding copies of your startup files and history, which `agent-repl stop rust` removes. Tested with evcxr 0.22.0 and evcxr's `main` on ARM64 macOS.
+
 ## [0.6.1] — 2026-11-11
 
 ### Fixed

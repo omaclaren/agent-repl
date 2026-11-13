@@ -36,6 +36,7 @@
 		"agent-repl-rb": "dist/bin/agent-repl-rb.js",
 		"agent-repl-java": "dist/bin/agent-repl-java.js",
 		"agent-repl-cpp": "dist/bin/agent-repl-cpp.js",
+		"agent-repl-rs": "dist/bin/agent-repl-rs.js",
 		"agent-repl-f90": "dist/bin/agent-repl-f90.js",
 		"agent-repl-octave": "dist/bin/agent-repl-octave.js",
 		"agent-repl-matlab": "dist/bin/agent-repl-matlab.js",

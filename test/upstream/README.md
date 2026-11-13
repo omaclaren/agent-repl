@@ -1,2 +1,2 @@
-pi-repl's own test suite, copied by scripts/sync-from-pi-repl.mjs from pi-repl 0.12.2 (bed43d0).
+pi-repl's own test suite, copied by scripts/sync-from-pi-repl.mjs from pi-repl 0.13.0 (9826a7b).
 Only import paths differ. Run with `npm run test:upstream`.

@@ -20,7 +20,7 @@ import type { ToolDefinition } from "./pi-compat/index.js";
 import { drainSettlingSends, settlingSendCount } from "./pi-repl.js";
 import { forAgentRepl } from "./text.js";
 
-export const INSTRUCTIONS = `agent-repl provides long-lived REPL sessions (Python/IPython, Julia, R, GHCi, Clojure, Ruby, Java, Octave, MATLAB, gnuplot, C++ and, experimentally, LFortran) running in tmux. The user can watch and type into the same session from a terminal, so treat it as shared state: inspect before changing it, and do not assume variables exist.
+export const INSTRUCTIONS = `agent-repl provides long-lived REPL sessions (Python/IPython, Julia, R, GHCi, Clojure, Ruby, Java, Octave, MATLAB, gnuplot, C++ and, experimentally, Rust (evcxr) and LFortran) running in tmux. The user can watch and type into the same session from a terminal, so treat it as shared state: inspect before changing it, and do not assume variables exist.
 
 Start or reuse a session with repl_start, choosing the runtime explicitly, then run code with repl_send. Use repl_status to check which sessions are running, and repl_history to list a session's record entries or read one. When an LFortran cell waits on a READ, answer it with repl_input. Stopping or restarting a session is the user's decision; they can run \`agent-repl stop <runtime>\` in a terminal. To show the user the session, suggest \`agent-repl attach <runtime>\`.
 
